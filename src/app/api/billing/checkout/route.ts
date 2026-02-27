@@ -3,6 +3,7 @@ import { requireServerAuth } from '@/lib/server-auth'
 import { PLAN_POLICIES, normalizePlan } from '@/lib/plans'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 const PLAN_PRICES: Record<string, number> = {
   plano1: 89.9,

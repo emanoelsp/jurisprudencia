@@ -4,6 +4,7 @@ import { requireServerAuth } from '@/lib/server-auth'
 import { computeTrialEndsAt, normalizePlan, planForUserPlan } from '@/lib/plans'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 function normalizeEmail(email?: string | null) {
   return String(email || '').trim().toLowerCase()

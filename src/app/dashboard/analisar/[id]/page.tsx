@@ -17,8 +17,12 @@ import toast from 'react-hot-toast'
 import Link from 'next/link'
 
 const TRIBUNAL_OPTIONS = [
-  'TJSP', 'TJRJ', 'TJMG', 'TJRS', 'TJPR', 'TJSC',
-  'TRF1', 'TRF2', 'TRF3', 'TRF4', 'TRF5', 'STJ',
+  'TODOS',
+  'STF', 'STJ', 'TST', 'TSE', 'STM',
+  'TRF1', 'TRF2', 'TRF3', 'TRF4', 'TRF5', 'TRF6',
+  'TJAC', 'TJAL', 'TJAM', 'TJAP', 'TJBA', 'TJCE', 'TJDFT', 'TJES', 'TJGO',
+  'TJMA', 'TJMG', 'TJMS', 'TJMT', 'TJPA', 'TJPB', 'TJPE', 'TJPI', 'TJPR',
+  'TJRJ', 'TJRN', 'TJRO', 'TJRR', 'TJRS', 'TJSC', 'TJSE', 'TJSP', 'TJTO',
 ]
 
 export default function AnalisarPage() {
@@ -48,7 +52,8 @@ export default function AnalisarPage() {
     const p = { id: snap.id, ...snap.data() } as Processo
     setProcesso(p)
     setEditorContent(p.teseFinal || '')
-    setSelectedTribunal((p.tribunal || 'TJSP').toUpperCase())
+    const tribunalDefault = (p.tribunal || 'TODOS').toUpperCase()
+    setSelectedTribunal(TRIBUNAL_OPTIONS.includes(tribunalDefault) ? tribunalDefault : 'TODOS')
     setLoading(false)
   }
 
@@ -83,7 +88,7 @@ export default function AnalisarPage() {
         body: JSON.stringify({
           processoId: id,
           texto: processo.textoOriginal,
-          tribunal: selectedTribunal,
+            tribunal: selectedTribunal,
           expandScope: !!options?.expandScope,
         }),
         signal: abortRef.current.signal,

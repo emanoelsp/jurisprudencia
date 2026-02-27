@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { requireServerAuth } from '@/lib/server-auth'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {

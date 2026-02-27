@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import Logo from '@/components/ui/Logo'
-import { Eye, EyeOff, ArrowRight, Scale, ShieldCheck, Radio, BriefcaseBusiness } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, Scale, ShieldCheck, Building2, BrainCircuit, Target } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { PlanId } from '@/lib/plans'
 
@@ -73,7 +73,7 @@ export default function HomePage() {
         <div className="relative z-10 space-y-3">
           <Logo size="lg" href="/" />
           <p className="text-brand-gold font-body text-sm uppercase tracking-widest font-semibold">
-            Plataforma Jurídica para Escritórios e Advogados
+            Inteligência Jurídica
           </p>
         </div>
 
@@ -81,21 +81,24 @@ export default function HomePage() {
         <div className="relative z-10 w-full max-w-2xl mx-auto py-8 space-y-8 animate-slide-up">
           <div className="space-y-4">
             <h1 className="font-display text-5xl font-bold text-brand-cream leading-tight">
-              Jurisprudência encontrada.<br />
-              <span className="text-brand-indigo hero-accent-readable">Parecer fortalecido.</span>
+              Inteligência Jurídica para<br />
+              <span className="text-brand-gold">decisões mais seguras.</span>
             </h1>
             <p className="font-body text-brand-slate text-lg leading-relaxed">
-              Jurisprudência confiável com arquitetura de IA avançada para entregar análise
-              mais precisa, mantendo o controle técnico nas mãos do advogado.
+              A IURISPRUDENTIA aplica inteligência artificial à análise de jurisprudência
+              para transformar dados jurídicos em estratégia concreta.
+            </p>
+            <p className="font-body text-brand-slate text-base leading-relaxed">
+              Dados. Direito. Decisão.
             </p>
           </div>
 
           <div className="space-y-4">
             {[
-              { icon: Scale, label: 'Pesquisa de Precedentes', desc: 'Localização de julgados relevantes para o caso concreto.' },
-              { icon: ShieldCheck, label: 'Integridade das Referências', desc: 'Preservação de números de processo, relatoria e tribunal sem distorções.' },
-              { icon: Radio, label: 'Acompanhamento em Tempo Real', desc: 'Evolução da análise e justificativas exibidas à medida que são produzidas.' },
-              { icon: BriefcaseBusiness, label: 'Confiança e Experiência', desc: 'A plataforma sugere o grau de confiança da jurisprudência, e sua vivência profissional consolida o parecer jurídico final.' },
+              { icon: Scale, label: 'A nova geração da pesquisa jurídica', desc: 'A pesquisa tradicional encontra decisões. A IURISPRUDENTIA encontra padrões, probabilidades e fundamentos estratégicos.' },
+              { icon: BrainCircuit, label: 'Sofisticação intelectual', desc: 'Mapeamento de entendimento por tribunal, câmara e julgador, com análise semântica e estruturação de fundamentos recorrentes.' },
+              { icon: Target, label: 'Posicionamento estratégico', desc: 'Apoio estratégico para construção de teses com foco em precisão, redução de risco e ganho de eficiência.' },
+              { icon: Building2, label: 'Peso institucional', desc: 'Desenvolvida para escritórios, grupos de advogados e operações B2B com exigência técnica e confiabilidade.' },
             ].map(({ icon: Icon, label, desc }) => (
               <div key={label} className="flex items-start gap-3 animate-slide-right">
                 <div className="w-9 h-9 rounded-lg bg-brand-indigo/15 border border-brand-indigo/25 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -110,17 +113,17 @@ export default function HomePage() {
           </div>
 
           <div className="legal-signal-panel">
-            <p className="legal-signal-title">Matriz de apoio ao parecer</p>
+            <p className="legal-signal-title">Inteligência aplicada ao contencioso</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="legal-signal-card">
-                <p className="legal-signal-label">Confiança sugerida</p>
-                <p className="legal-signal-value">Alta</p>
-                <p className="legal-signal-text">Baseada na aderência entre fatos do processo e precedentes correlatos.</p>
+                <p className="legal-signal-label">Fundamento institucional</p>
+                <p className="legal-signal-value">Rigor técnico</p>
+                <p className="legal-signal-text">Processamento avançado de linguagem jurídica, modelos semânticos e segurança da informação.</p>
               </div>
               <div className="legal-signal-card">
-                <p className="legal-signal-label">Experiência do advogado</p>
-                <p className="legal-signal-value">Essencial</p>
-                <p className="legal-signal-text">A estratégia final permanece sob seu critério técnico e visão de causa.</p>
+                <p className="legal-signal-label">Resultado prático</p>
+                <p className="legal-signal-value">Estratégia</p>
+                <p className="legal-signal-text">Jurisprudência convertida em insight estratégico, vantagem competitiva e decisão fundamentada.</p>
               </div>
             </div>
           </div>
@@ -128,18 +131,18 @@ export default function HomePage() {
           <div className="pricing-impact-panel">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <p className="pricing-kicker">Posicionamento Comercial</p>
-                <h3 className="pricing-title">Planos a partir de R$ 89,90</h3>
+                <p className="pricing-kicker">Posicionamento Institucional</p>
+                <h3 className="pricing-title">Solução para escritórios e jurídico corporativo</h3>
               </div>
-              <p className="pricing-note">Sem fidelidade anual obrigatória</p>
+              <p className="pricing-note">Solicitar demonstração · Falar com especialista</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-4">
               {[
-                { name: 'Plano 1', price: 'R$ 89,90', limits: '1 usuário · até 20 processos' },
-                { name: 'Plano 2', price: 'R$ 179,90', limits: '1 usuário · até 70 processos' },
-                { name: 'Plano 3 Escritório', price: 'R$ 459,90', limits: 'até 6 usuários · até 350 processos' },
-                { name: 'Plano 4 Start Escritório', price: 'Sob consulta', limits: 'Entre em contato para alinhar o melhor plano' },
+                { name: 'Precedentes relevantes', price: 'Precisão', limits: 'Identificação de julgados com maior aderência ao caso concreto' },
+                { name: 'Padrões decisórios', price: 'Leitura estratégica', limits: 'Mapeamento por tribunal, câmara e julgador' },
+                { name: 'Contencioso estratégico', price: 'Eficiência', limits: 'Organização inteligente de fundamentos recorrentes' },
+                { name: 'Governança jurídica', price: 'Confiabilidade', limits: 'Segurança, confidencialidade e rigor técnico institucional' },
               ].map(plan => (
                 <div key={plan.name} className="pricing-card">
                   <p className="pricing-card-name">{plan.name}</p>
@@ -153,7 +156,7 @@ export default function HomePage() {
 
         {/* Footer */}
         <p className="font-body text-brand-slate text-xs relative z-10">
-          © {new Date().getFullYear()} JurisprudencIA. Todos os direitos reservados.
+          © {new Date().getFullYear()} IURISPRUDENTIA. Todos os direitos reservados.
         </p>
       </div>
 
@@ -175,8 +178,8 @@ export default function HomePage() {
             </h2>
             <p className="font-body text-brand-slate text-sm mt-1">
               {mode === 'login'
-                ? 'Acesse seu ambiente de trabalho para continuar.'
-                : 'Comece sua avaliação com acesso completo.'}
+                ? 'Acesse seu ambiente institucional para continuar.'
+                : 'Inicie sua avaliação e conheça a inteligência jurídica da IURISPRUDENTIA.'}
             </p>
             <p className="font-body text-brand-indigo text-xs font-semibold mt-2">
               Free: 7 dias e 2 documentos por dia

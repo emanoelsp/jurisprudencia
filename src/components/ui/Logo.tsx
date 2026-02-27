@@ -9,9 +9,9 @@ interface LogoProps {
 }
 
 const sizes = {
-  sm: { text: 'text-xl',   ia: 'text-xl'  },
-  md: { text: 'text-2xl',  ia: 'text-2xl' },
-  lg: { text: 'text-4xl',  ia: 'text-4xl' },
+  sm: { text: 'text-lg tracking-[0.08em]',   ia: 'text-lg tracking-[0.08em]'  },
+  md: { text: 'text-2xl tracking-[0.09em]',  ia: 'text-2xl tracking-[0.09em]' },
+  lg: { text: 'text-4xl tracking-[0.1em]',   ia: 'text-4xl tracking-[0.1em]' },
 }
 
 export default function Logo({ size = 'md', href = '/dashboard', className }: LogoProps) {
@@ -19,10 +19,10 @@ export default function Logo({ size = 'md', href = '/dashboard', className }: Lo
   const content = (
     <span className={cn('inline-flex items-baseline gap-0 select-none', className)}>
       <span className={cn('font-display font-bold tracking-tight text-brand-cream', s.text)}>
-        Jurisprudenc
+        IURIS
       </span>
-      <span className={cn('font-display font-black tracking-tight text-brand-indigo', s.ia)}>
-        IA
+      <span className={cn('font-display font-semibold tracking-tight text-brand-indigo', s.ia)}>
+        PRUDENTIA
       </span>
     </span>
   )

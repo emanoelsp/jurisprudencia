@@ -21,6 +21,8 @@ import { v4 as uuidv4 } from 'uuid'
 const emptyForm: FormularioProcesso = {
   numero: '', cliente: '', natureza: '', vara: '', tribunal: '', dataProtocolo: '',
 }
+const STORAGE_UPLOAD_TIMEOUT_MS = 90_000
+const STORAGE_URL_TIMEOUT_MS = 20_000
 
 export default function ProcessosPage() {
   const { user } = useAuth()
@@ -130,11 +132,11 @@ export default function ProcessosPage() {
         console.log('[save-processo] upload start', { sizeBytes: pdfFile.size, type: pdfFile.type })
         try {
           const fileRef = ref(storage, `processos/${user.uid}/${uuidv4()}.pdf`)
-          await withTimeout(uploadBytes(fileRef, pdfFile), 20000, 'uploadBytes')
+          await withTimeout(uploadBytes(fileRef, pdfFile), STORAGE_UPLOAD_TIMEOUT_MS, 'uploadBytes')
           storagePath = fileRef.fullPath
           console.log('[save-processo] upload done', { ms: Math.round(performance.now() - tUpload) })
           try {
-            storageUrl = await withTimeout(getDownloadURL(fileRef), 10000, 'getDownloadURL')
+            storageUrl = await withTimeout(getDownloadURL(fileRef), STORAGE_URL_TIMEOUT_MS, 'getDownloadURL')
             console.log('[save-processo] storage URL generated')
           } catch (readErr: any) {
             console.error('[save-processo] getDownloadURL failed', readErr)

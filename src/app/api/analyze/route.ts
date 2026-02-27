@@ -20,6 +20,7 @@ import { normalizePlan, planForUserPlan } from '@/lib/plans'
 import type { AnalysisChunk } from '@/types'
 
 export const runtime    = 'nodejs'
+export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const DEFAULT_TOP_RESULTS = 3
@@ -182,7 +183,8 @@ export async function POST(req: NextRequest) {
   const { processoId, texto, topResults, minConfidence, tribunal, expandScope } = payload
   const topResultsLimit = resolveTopResults(topResults)
   const minConfidenceScore = resolveMinConfidence(minConfidence)
-  const tribunalFilter = typeof tribunal === 'string' ? tribunal.trim().toUpperCase() : ''
+  const tribunalRaw = typeof tribunal === 'string' ? tribunal.trim().toUpperCase() : ''
+  const tribunalFilter = tribunalRaw === 'TODOS' ? '' : tribunalRaw
   const shouldExpandScope = Boolean(expandScope)
   const db = adminDb()
   const userSnap = await db.collection('users').doc(authUser.uid).get()
@@ -246,6 +248,12 @@ export async function POST(req: NextRequest) {
             })
         )
         console.log('[analyze] step searchEproc', { reqId, ms: Date.now() - tSearch, count: rawResults.length })
+        send({
+          type: 'metadata',
+          data: {
+            rag_source: rawResults.some(r => r.fonte === 'base_interna') ? 'pinecone' : 'fallback_mock',
+          } as any,
+        })
 
         // ─── Step 2: Reranking ───────────────────────────
         const tRerank = Date.now()

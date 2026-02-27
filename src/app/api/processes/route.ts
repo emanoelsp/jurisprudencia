@@ -3,8 +3,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
 import { requireServerAuth } from '@/lib/server-auth'
 import { normalizePlan, planForUserPlan, todayDateKey } from '@/lib/plans'
+import { chunkText, generateEmbedding } from '@/lib/rag'
+import { upsertPinecone } from '@/lib/pinecone'
+import { namespaceForUser } from '@/lib/tenant'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 function freeTrialExpired(trialEndsAt?: string | null, createdAt?: string | null) {
   if (trialEndsAt) {
@@ -158,6 +162,45 @@ export async function POST(req: NextRequest) {
         updatedAt: nowIso,
       }, { merge: true })
     })
+
+    // Optional automatic indexing in Pinecone so user RAG works immediately.
+    if (process.env.PINECONE_API_KEY && process.env.PINECONE_HOST && String(payload?.textoOriginal || '').trim().length > 200) {
+      try {
+        const namespace = namespaceForUser(authUser.uid)
+        const chunks = chunkText(String(payload.textoOriginal), 900, 180).slice(0, 6)
+        const vectors: Array<{ id: string; values: number[]; metadata: Record<string, unknown> }> = []
+        for (let i = 0; i < chunks.length; i += 1) {
+          const c = chunks[i]
+          const emb = await generateEmbedding(c)
+          vectors.push({
+            id: `${processoRef.id}::proc::${i}`,
+            values: emb,
+            metadata: {
+              fonte: 'base_interna',
+              processoId: processoRef.id,
+              numero: String(payload.numero || ''),
+              tribunal: String(payload.tribunal || ''),
+              relator: '',
+              dataJulgamento: String(payload.dataProtocolo || ''),
+              ementa: c.slice(0, 1800),
+              texto: c.slice(0, 1800),
+              userId: authUser.uid,
+              ingestedAt: nowIso,
+            },
+          })
+        }
+        if (vectors.length > 0) {
+          await upsertPinecone(vectors, namespace)
+          console.log('[processes] pinecone upsert ok', {
+            processoId: processoRef.id,
+            namespace: namespace || 'default',
+            vectors: vectors.length,
+          })
+        }
+      } catch (pcErr) {
+        console.warn('[processes] pinecone upsert failed (non-blocking)', pcErr)
+      }
+    }
 
     return NextResponse.json({ success: true, id: processoRef.id })
   } catch (err: any) {

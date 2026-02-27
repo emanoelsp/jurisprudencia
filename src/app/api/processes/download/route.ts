@@ -3,6 +3,7 @@ import { adminDb, adminStorage } from '@/lib/firebase-admin'
 import { requireServerAuth } from '@/lib/server-auth'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 function extractStoragePathFromUrl(storageUrl: string): string | null {
   try {

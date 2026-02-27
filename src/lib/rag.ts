@@ -216,13 +216,30 @@ export async function searchEproc(
   if (process.env.PINECONE_HOST && process.env.PINECONE_API_KEY) {
     try {
       const vector = await generateEmbedding(queryText)
-      const data = await queryPinecone(
-        vector,
-        topK,
-        tribunal ? { tribunal: { $eq: tribunal } } : undefined,
-        namespace || undefined
-      )
-      const matches = Array.isArray(data?.matches) ? data.matches : []
+      const filter = tribunal ? { tribunal: { $eq: tribunal } } : undefined
+      const globalNamespace = process.env.PINECONE_NAMESPACE?.trim() || ''
+      const candidates = Array.from(new Set([
+        namespace || '',
+        globalNamespace,
+        '',
+      ])).filter(Boolean)
+      const namespaceChain = candidates.length > 0 ? candidates : [undefined]
+
+      let matches: any[] = []
+      for (const ns of namespaceChain as Array<string | undefined>) {
+        const data = await queryPinecone(
+          vector,
+          topK,
+          filter,
+          ns || undefined
+        )
+        const currentMatches = Array.isArray(data?.matches) ? data.matches : []
+        if (currentMatches.length > 0) {
+          matches = currentMatches
+          break
+        }
+      }
+
       const fromPinecone: EprocResult[] = matches.map((m: any, i: number) => ({
         id: String(m.id || `pc-${i}`),
         numero: String(m.metadata?.numero || m.metadata?.processo || ''),
@@ -232,7 +249,7 @@ export async function searchEproc(
         dataJulgamento: String(m.metadata?.dataJulgamento || ''),
         score: Number(m.score || 0),
         badge: scoreToBadge(Number(m.score || 0)),
-        fonte: 'datajud_cnj',
+        fonte: 'base_interna',
       }))
 
       if (fromPinecone.length > 0) {

@@ -4,7 +4,32 @@ import { extractTextFromBuffer, extractMetadata } from '@/lib/rag'
 import { requireServerAuth } from '@/lib/server-auth'
 
 export const runtime = 'nodejs'
-export const maxDuration = 30
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms)),
+  ])
+}
+
+function quickMetadataFallback(text: string) {
+  const numero = text.match(/\b\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}\b/)?.[0] || ''
+  const cliente =
+    text.match(/(?:AUTOR\(A\)|AUTOR|REQUERENTE|CLIENTE)\s*:\s*([^\n\r]+)/i)?.[1]?.trim() || ''
+  const natureza = text.match(/(?:Classe|Natureza)\s*:\s*([^\n\r]+)/i)?.[1]?.trim() || ''
+  const vara = text.match(/(?:Vara|Órgão julgador|Orgao julgador)\s*:\s*([^\n\r]+)/i)?.[1]?.trim() || ''
+  const tribunal = text.match(/\b(STJ|STF|TST|TJ[A-Z]{2}|TRF\d|TRT\d{1,2})\b/)?.[1] || ''
+  return {
+    numero,
+    cliente,
+    natureza,
+    vara,
+    tribunal,
+    dataProtocolo: '',
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,7 +54,12 @@ export async function POST(req: NextRequest) {
 
     // Auto-fill extraction
     const tMeta = Date.now()
-    const metadata = await extractMetadata(text)
+    let metadata = quickMetadataFallback(text)
+    try {
+      metadata = await withTimeout(extractMetadata(text), 5000)
+    } catch (metaErr) {
+      console.warn('[ingest] extractMetadata timeout/fallback', metaErr)
+    }
     console.log('[ingest] extractMetadata done', { ms: Date.now() - tMeta, metadata })
 
     console.log('[ingest] complete', { totalMs: Date.now() - startedAt })
