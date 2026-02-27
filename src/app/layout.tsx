@@ -26,8 +26,8 @@ const jetbrains = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'JurisprudencIA — Plataforma de Inteligência Jurídica',
-  description: 'Análise de jurisprudência com IA de elite para advogados.',
+  title: 'IURISPRUDENTIA — Inteligência Jurídica',
+  description: 'Dados. Direito. Decisão.',
   icons: { icon: '/favicon.svg' },
 }
 

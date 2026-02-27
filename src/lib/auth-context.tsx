@@ -36,6 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading,  setLoading]  = useState(true)
 
   useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      setLoading(false)
+    }, 4000)
+
+    if (!auth) {
+      setLoading(false)
+      clearTimeout(fallbackTimer)
+      return
+    }
+
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser)
       if (firebaseUser) {
@@ -48,8 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUserData(null)
       }
       setLoading(false)
+      clearTimeout(fallbackTimer)
     })
-    return unsub
+    return () => {
+      clearTimeout(fallbackTimer)
+      unsub()
+    }
   }, [])
 
   async function signIn(email: string, password: string) {
