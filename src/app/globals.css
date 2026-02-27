@@ -1,0 +1,285 @@
+/* src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Custom Scrollbar ─────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: #0B1628; }
+::-webkit-scrollbar-thumb  { background: #1E2D4A; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4F46E5; }
+
+/* ─── Selection ────────────────────────────────────── */
+::selection { background: rgba(79,70,229,0.3); color: #F8F5EF; }
+
+/* ─── Base ─────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+/* ─── Typography ───────────────────────────────────── */
+.font-display { font-family: var(--font-playfair), Georgia, serif; }
+
+/* ─── Components ───────────────────────────────────── */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 bg-brand-indigo text-white
+           font-body font-semibold text-sm rounded-lg border border-brand-indigolt/30
+           hover:bg-brand-indigolt transition-all duration-200
+           shadow-indigo hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 bg-brand-gold text-brand-navy
+           font-body font-semibold text-sm rounded-lg border border-brand-goldlt/30
+           hover:bg-brand-goldlt transition-all duration-200
+           shadow-gold hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2 text-brand-slate
+           font-body text-sm rounded-lg border border-transparent
+           hover:border-brand-border hover:text-brand-cream hover:bg-brand-navylt
+           transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-brand-navylt border border-brand-border rounded-xl shadow-card;
+  }
+
+  .card-hover {
+    @apply card hover:border-brand-indigo/40 hover:shadow-indigo
+           transition-all duration-300 cursor-pointer;
+  }
+
+  .input {
+    @apply w-full bg-brand-navy border border-brand-border rounded-lg px-4 py-2.5
+           text-brand-cream placeholder-brand-slate font-body text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand-indigo/50 focus:border-brand-indigo
+           transition-all duration-200;
+  }
+
+  .label {
+    @apply block text-xs font-semibold text-brand-slate uppercase tracking-wider mb-1.5;
+  }
+
+  .badge-alta {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold
+           bg-emerald-500/15 text-emerald-400 border border-emerald-500/25;
+  }
+
+  .badge-media {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold
+           bg-amber-500/15 text-amber-400 border border-amber-500/25;
+  }
+
+  .badge-baixa {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold
+           bg-red-500/15 text-red-400 border border-red-500/25;
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.04) 50%,
+      rgba(255,255,255,0) 100%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  .stream-char {
+    @apply animate-stream;
+  }
+
+  .section-title {
+    @apply font-display text-2xl font-bold text-brand-cream tracking-tight;
+  }
+
+  .divider {
+    @apply border-t border-brand-border;
+  }
+
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+}
+
+/* ─── Animations ───────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+@keyframes stream {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-ring {
+  0%   { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.animate-stream { animation: stream 0.2s ease-out; }
+.animate-pulse-ring { animation: pulse-ring 1.5s infinite; }
+
+/* ─── Prose (Editor) ───────────────────────────────── */
+.legal-editor {
+  font-family: var(--font-source);
+  line-height: 1.8;
+  color: #F8F5EF;
+}
+
+.legal-editor:focus { outline: none; }
+
+/* ─── Grid Background ──────────────────────────────── */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(79,70,229,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,70,229,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.legal-hero-bg {
+  background-image:
+    radial-gradient(circle at 14% 18%, rgba(201,169,78,0.11) 0%, rgba(201,169,78,0) 28%),
+    radial-gradient(circle at 42% 62%, rgba(79,70,229,0.16) 0%, rgba(79,70,229,0) 34%),
+    linear-gradient(120deg, rgba(248,245,239,0.03) 0%, rgba(248,245,239,0) 40%);
+}
+
+.legal-signal-panel {
+  border: 1px solid rgba(201,169,78,0.2);
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(19,33,58,0.88), rgba(11,22,40,0.92));
+  padding: 14px;
+}
+
+.legal-signal-title {
+  color: #F8F5EF;
+  font-family: var(--font-source);
+  font-size: 0.78rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+
+.legal-signal-card {
+  border: 1px solid rgba(92,106,136,0.4);
+  border-radius: 10px;
+  background: rgba(19,33,58,0.45);
+  padding: 10px;
+}
+
+.legal-signal-label {
+  color: #9AA7C2;
+  font-family: var(--font-source);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.25rem;
+}
+
+.legal-signal-value {
+  color: #F8F5EF;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.legal-signal-text {
+  color: #9AA7C2;
+  font-family: var(--font-source);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.hero-accent-readable {
+  -webkit-text-stroke: 1px rgba(248,245,239,0.8);
+  text-stroke: 1px rgba(248,245,239,0.8);
+}
+
+.pricing-impact-panel {
+  border: 1px solid rgba(79,70,229,0.35);
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(17,28,50,0.92), rgba(10,19,36,0.96));
+  padding: 14px;
+}
+
+.pricing-kicker {
+  color: #C9A94E;
+  font-family: var(--font-source);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+
+.pricing-title {
+  color: #F8F5EF;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.pricing-note {
+  color: #9AA7C2;
+  font-family: var(--font-source);
+  font-size: 0.73rem;
+}
+
+.pricing-card {
+  border: 1px solid rgba(92,106,136,0.42);
+  border-radius: 10px;
+  background: rgba(19,33,58,0.5);
+  padding: 10px;
+}
+
+.pricing-card-name {
+  color: #F8F5EF;
+  font-family: var(--font-source);
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.pricing-card-price {
+  color: #6F67FF;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.pricing-card-limits {
+  color: #9AA7C2;
+  font-family: var(--font-source);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+/* ─── Gradient Glow ────────────────────────────────── */
+.glow-indigo {
+  box-shadow: 0 0 40px rgba(79,70,229,0.2), 0 0 80px rgba(79,70,229,0.08);
+}
+.glow-gold {
+  box-shadow: 0 0 40px rgba(201,169,78,0.2), 0 0 80px rgba(201,169,78,0.08);
+}

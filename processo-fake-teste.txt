@@ -1,0 +1,49 @@
+PROCESSO JUDICIAL FICTÍCIO – APENAS PARA TESTES
+
+Número CNJ: 5001234-56.2024.8.26.0100
+Classe: Ação de Indenização por Danos Morais e Materiais
+Vara: 12ª Vara Cível da Comarca de São Paulo
+Tribunal: TJSP
+Data de Protocolo: 2024-11-03
+
+AUTOR(A): Marina Lopes Ferreira
+CPF: 123.456.789-10
+RÉU: Banco Horizonte S.A.
+CNPJ: 12.345.678/0001-90
+
+I – RESUMO DOS FATOS
+A autora alega que, em 15/08/2024, verificou inscrição indevida de seu nome em cadastro de inadimplentes,
+referente a contrato bancário que afirma jamais ter celebrado.
+
+Relata que tentou resolver administrativamente em 3 oportunidades (protocolos:
+BH-2024-8891, BH-2024-9012 e BH-2024-9477), sem sucesso.
+
+Sustenta que a negativação ocasionou recusa de crédito imobiliário,
+abalando sua reputação e causando constrangimento.
+
+II – FUNDAMENTOS JURÍDICOS (SÍNTESE)
+1. Relação de consumo (CDC, arts. 2º e 3º).
+2. Responsabilidade objetiva do fornecedor (CDC, art. 14).
+3. Inscrição indevida em cadastro restritivo gera dano moral presumido (in re ipsa).
+4. Dever de reparação por danos materiais comprovados.
+
+III – PEDIDOS
+a) Tutela de urgência para exclusão imediata do apontamento restritivo.
+b) Declaração de inexistência do débito.
+c) Condenação em danos morais no valor sugerido de R$ 15.000,00.
+d) Condenação em danos materiais no valor de R$ 2.840,00.
+e) Inversão do ônus da prova (CDC, art. 6º, VIII).
+
+IV – DOCUMENTOS MENCIONADOS
+- Comprovante de negativação (SERASA) de 15/08/2024.
+- Prints dos protocolos de atendimento.
+- Carta de recusa de crédito imobiliário.
+- Comprovantes de despesas extraordinárias.
+
+V – OBSERVAÇÃO
+Documento fictício elaborado exclusivamente para teste de extração de metadados,
+busca de jurisprudência e geração assistida de parecer.
+
+Local e data: São Paulo, 03 de novembro de 2024.
+Advogado(a): Dr(a). Rafael Mendes Prado
+OAB/SP: 123.456

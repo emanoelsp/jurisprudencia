@@ -1,0 +1,502 @@
+[
+  {
+    "id": 1,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 1",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 2,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 2",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 3,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 3",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 4,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 4",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 5,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 5",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 6,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 6",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 7,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 7",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 8,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 8",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 9,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 9",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 10,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 10",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 11,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 11",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 12,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 12",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 13,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 13",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 14,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 14",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 15,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 15",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 16,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 16",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 17,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 17",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 18,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 18",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 19,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 19",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 20,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 20",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 21,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 21",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 22,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 22",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 23,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 23",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 24,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 24",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 25,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 25",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 26,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 26",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 27,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 27",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 28,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 28",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 29,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 29",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 30,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 30",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 31,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 31",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 32,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 32",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 33,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 33",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 34,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 34",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 35,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 35",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 36,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 36",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 37,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 37",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 38,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 38",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 39,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 39",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 40,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 40",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 41,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 41",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 42,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 42",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 43,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 43",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 44,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 44",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 45,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 45",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 46,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 46",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 47,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 47",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 48,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 48",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 49,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 49",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 50,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 50",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 51,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 51",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 52,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 52",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 53,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 53",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 54,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 54",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 55,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 55",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 56,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 56",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 57,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 57",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 58,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 58",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 59,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 59",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 60,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 60",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 61,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 61",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 62,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 62",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 63,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 63",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 64,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 64",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 65,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 65",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 66,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 66",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 67,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 67",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 68,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 68",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 69,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 69",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 70,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 70",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 71,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 71",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 72,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 72",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 73,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 73",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 74,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 74",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 75,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 75",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 76,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 76",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 77,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 77",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 78,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 78",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 79,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 79",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 80,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 80",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 81,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 81",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 82,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 82",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 83,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 83",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 84,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 84",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 85,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 85",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 86,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 86",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 87,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 87",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 88,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 88",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 89,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 89",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 90,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 90",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 91,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 91",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 92,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 92",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 93,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 93",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 94,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 94",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 95,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 95",
+    "expectedLabel": "administrativo"
+  },
+  {
+    "id": 96,
+    "query": "acao de indenizacao por dano moral e negativacao indevida do nome caso 96",
+    "expectedLabel": "civil"
+  },
+  {
+    "id": 97,
+    "query": "acao tributaria sobre imposto de renda e glosa fiscal de despesas medicas caso 97",
+    "expectedLabel": "tributario"
+  },
+  {
+    "id": 98,
+    "query": "acao do consumidor por clausula abusiva e revisao contratual caso 98",
+    "expectedLabel": "consumidor"
+  },
+  {
+    "id": 99,
+    "query": "pedido de tutela de urgencia com fumus boni iuris e periculum in mora caso 99",
+    "expectedLabel": "processual"
+  },
+  {
+    "id": 100,
+    "query": "acao de servidor publico por licenca premio e aposentadoria caso 100",
+    "expectedLabel": "administrativo"
+  }
+]
