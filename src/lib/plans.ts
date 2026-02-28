@@ -19,7 +19,7 @@ export type PlanPolicy = {
 export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
   free: {
     id: 'free',
-    name: 'Free',
+    name: 'Trial',
     priceLabel: 'R$ 0,00',
     trialDays: 7,
     limits: {
@@ -37,7 +37,7 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
   },
   plano1: {
     id: 'plano1',
-    name: 'Plano 1',
+    name: 'Starter',
     priceLabel: 'R$ 89,90',
     limits: {
       docsPerDay: 10,
@@ -55,7 +55,7 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
   },
   plano2: {
     id: 'plano2',
-    name: 'Plano 2',
+    name: 'Pro',
     priceLabel: 'R$ 179,90',
     limits: {
       docsPerDay: 30,
@@ -73,7 +73,7 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
   },
   escritorio: {
     id: 'escritorio',
-    name: 'Plano Escritório',
+    name: 'Escritório',
     priceLabel: 'R$ 459,90',
     limits: {
       docsPerDay: 120,
@@ -91,7 +91,7 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
   },
   start: {
     id: 'start',
-    name: 'Start Escritório',
+    name: 'Enterprise',
     priceLabel: 'Sob consulta',
     limits: {
       docsPerDay: 300,
@@ -110,7 +110,7 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
 }
 
 export function normalizePlan(input: string | undefined | null): PlanId {
-  const raw = String(input || '').toLowerCase()
+  const raw = String(input || '').toLowerCase().replace(/\s+/g, '')
   if (raw === 'trial' || raw === 'free') return 'free'
   if (raw === 'plano1') return 'plano1'
   if (raw === 'plano2') return 'plano2'

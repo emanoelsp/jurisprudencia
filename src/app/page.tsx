@@ -210,11 +210,11 @@ export default function HomePage() {
                   className="input"
                   required
                 >
-                  <option value="free">Free (7 dias, 2 documentos/dia)</option>
-                  <option value="plano1">Plano 1 (R$ 89,90)</option>
-                  <option value="plano2">Plano 2 (R$ 179,90)</option>
-                  <option value="escritorio">Plano Escritório (R$ 459,90)</option>
-                  <option value="start">Start Escritório (sob consulta)</option>
+                  <option value="free">Trial (7 dias, 2 documentos/dia)</option>
+                  <option value="plano1">Starter (R$ 89,90)</option>
+                  <option value="plano2">Pro (R$ 179,90)</option>
+                  <option value="escritorio">Escritório (R$ 459,90)</option>
+                  <option value="start">Enterprise (sob consulta)</option>
                 </select>
               </div>
             )}

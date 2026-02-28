@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
+import { normalizePlan, planForUserPlan } from '@/lib/plans'
 import Logo from '@/components/ui/Logo'
 import {
   LayoutDashboard, FileText, BookOpen,
@@ -35,13 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   function planLabel(raw?: string) {
-    const plan = String(raw || '').toLowerCase()
-    if (plan === 'trial' || plan === 'free') return 'Free'
-    if (plan === 'plano1') return 'Plano 1'
-    if (plan === 'plano2') return 'Plano 2'
-    if (plan === 'escritorio') return 'Escritório'
-    if (plan === 'start') return 'Start Escritório'
-    return 'Free'
+    return planForUserPlan(normalizePlan(raw))?.name ?? 'Trial'
   }
 
   function freeDaysLeft(trialEndsAt?: string) {
@@ -96,7 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <Crown size={14} className="text-brand-gold" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-brand-gold">Plano Free</p>
+                <p className="text-xs font-semibold text-brand-gold">Plano Trial</p>
                 <p className="text-xs text-brand-slate truncate">
                   {freeDaysLeft(userData?.trialEndsAt) ?? 0} dias restantes
                 </p>

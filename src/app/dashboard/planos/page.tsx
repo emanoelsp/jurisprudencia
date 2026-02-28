@@ -114,7 +114,7 @@ export default function PlanosPage() {
       <div className="card p-4">
         <p className="text-sm text-brand-cream font-semibold">Vantagens exclusivas dos planos pagos</p>
         <p className="text-xs text-brand-slate mt-1">
-          Expandir tribunais, rerank avançado, fila prioritária e maior volume diário. O plano Free não inclui esses recursos.
+          Expandir tribunais, rerank avançado, fila prioritária e maior volume diário. O plano Trial não inclui esses recursos.
         </p>
       </div>
     </div>
