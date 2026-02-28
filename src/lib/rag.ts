@@ -5,6 +5,7 @@ import { createToonPayload } from './toon'
 import { aiClient, aiModels } from './ai'
 import { parseExtractedMetadataJson } from './guards'
 import { queryPinecone } from './pinecone'
+import { fetchDataJudByQuery } from './datajud'
 
 const EMBEDDING_CACHE_TTL_MS = 30 * 60 * 1000
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000
@@ -198,8 +199,8 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   return embedding
 }
 
-// ─── 5. Mock eproc Vector Search ─────────────────────────────────────────────
-// In production: replace with Pinecone/Weaviate/pgvector query
+// ─── 5. Busca jurisprudência (DataJud API + Pinecone opcional) ─────────────────
+// Sem mock: usa apenas DataJud (API Pública CNJ) e/ou Pinecone (se configurado).
 
 export async function searchEproc(
   queryText: string,
@@ -212,132 +213,92 @@ export async function searchEproc(
   const cached = getCache(searchCache, cacheKey)
   if (cached) return cached.map(r => ({ ...r }))
 
-  // Optional production path: Pinecone vector search
-  if (process.env.PINECONE_HOST && process.env.PINECONE_API_KEY) {
+  let results: EprocResult[] = []
+
+  // 1. DataJud API (fonte principal quando tribunal definido)
+  const apiKey = process.env.DATAJUD_API_KEY
+  if (apiKey && tribunal && tribunal !== 'TODOS') {
     try {
-      const vector = await generateEmbedding(queryText)
-      const filter = tribunal ? { tribunal: { $eq: tribunal } } : undefined
-      const globalNamespace = process.env.PINECONE_NAMESPACE?.trim() || ''
-      const candidates = Array.from(new Set([
-        namespace || '',
-        globalNamespace,
-        '',
-      ])).filter(Boolean)
-      const namespaceChain = candidates.length > 0 ? candidates : [undefined]
-
-      let matches: any[] = []
-      for (const ns of namespaceChain as Array<string | undefined>) {
-        const data = await queryPinecone(
-          vector,
-          topK,
-          filter,
-          ns || undefined
-        )
-        const currentMatches = Array.isArray(data?.matches) ? data.matches : []
-        if (currentMatches.length > 0) {
-          matches = currentMatches
-          break
-        }
-      }
-
-      const fromPinecone: EprocResult[] = matches.map((m: any, i: number) => ({
-        id: String(m.id || `pc-${i}`),
-        numero: String(m.metadata?.numero || m.metadata?.processo || ''),
-        ementa: String(m.metadata?.ementa || m.metadata?.texto || ''),
-        tribunal: String(m.metadata?.tribunal || ''),
-        relator: String(m.metadata?.relator || ''),
-        dataJulgamento: String(m.metadata?.dataJulgamento || ''),
-        score: Number(m.score || 0),
-        badge: scoreToBadge(Number(m.score || 0)),
-        fonte: 'base_interna',
-      }))
-
-      if (fromPinecone.length > 0) {
-        setCache(searchCache, cacheKey, fromPinecone, SEARCH_CACHE_TTL_MS)
-        return fromPinecone.map(r => ({ ...r }))
+      const datajudDocs = await fetchDataJudByQuery({
+        queryText,
+        tribunalSigla: tribunal,
+        apiKey,
+        size: topK,
+      })
+      if (datajudDocs.length > 0) {
+        results = datajudDocs.map((d, i) => ({
+          id: d.id,
+          numero: d.numero,
+          ementa: d.ementa,
+          tribunal: d.tribunal,
+          relator: d.relator,
+          dataJulgamento: d.dataJulgamento,
+          score: 0.85 - i * 0.04,
+          badge: scoreToBadge(0.85 - i * 0.04),
+          fonte: 'datajud_cnj',
+        }))
       }
     } catch (err) {
-      console.warn('[rag] pinecone query failed, using fallback', err)
+      console.warn('[rag] datajud query failed', err)
     }
   }
 
-  // Simulated eproc results with realistic Brazilian legal data
-  // Production: query your vector store with the embedding of queryText
-  const mockResults: EprocResult[] = [
-    {
-      id: 'ep001',
-      numero: '1023456-78.2022.8.26.0100',
-      ementa: 'RESPONSABILIDADE CIVIL. Dano moral. Negativação indevida do nome. Presunção de dano. Desnecessidade de prova do prejuízo. Quantum indenizatório. Razoabilidade. Manutenção. Recurso desprovido.',
-      tribunal: 'TJSP',
-      relator: 'Des. Carlos Alberto Garbi',
-      dataJulgamento: '2023-03-15',
-      score: 0.91,
-      badge: 'alta',
-      fonte: 'datajud_cnj',
-    },
-    {
-      id: 'ep002',
-      numero: '0009876-54.2021.4.03.6100',
-      ementa: 'TRIBUTÁRIO. Imposto de Renda. Dedução de despesas médicas. Comprovação. Documentos hábeis. Glosa fiscal. Ilegalidade. Apelação provida.',
-      tribunal: 'TRF3',
-      relator: 'Des. Fed. Márcio Moraes',
-      dataJulgamento: '2023-07-20',
-      score: 0.85,
-      badge: 'alta',
-      fonte: 'datajud_cnj',
-    },
-    {
-      id: 'ep003',
-      numero: '2034567-89.2020.8.19.0001',
-      ementa: 'DIREITO DO CONSUMIDOR. Contrato de prestação de serviços. Cláusula abusiva. Revisão contratual. CDC. Aplicabilidade. Multa moratória. Redução. Recurso parcialmente provido.',
-      tribunal: 'TJRJ',
-      relator: 'Des. Renata Cotta',
-      dataJulgamento: '2022-11-08',
-      score: 0.82,
-      badge: 'alta',
-      fonte: 'datajud_cnj',
-    },
-    {
-      id: 'ep004',
-      numero: '3045678-90.2019.3.00.0000',
-      ementa: 'PROCESSO CIVIL. Tutela antecipada. Urgência. Requisitos. Fumus boni iuris. Periculum in mora. Presentes. Deferimento. Decisão mantida. Agravo desprovido.',
-      tribunal: 'STJ',
-      relator: 'Min. Nancy Andrighi',
-      dataJulgamento: '2023-09-12',
-      score: 0.78,
-      badge: 'media',
-      fonte: 'datajud_cnj',
-    },
-    {
-      id: 'ep005',
-      numero: '4056789-01.2018.8.26.0506',
-      ementa: 'ADMINISTRATIVO. Servidor público. Licença-prêmio. Conversão em pecúnia. Possibilidade. Aposentadoria. Direito adquirido. Precedentes. Recurso provido.',
-      tribunal: 'TJSP',
-      relator: 'Des. Oswaldo Luís Palu',
-      dataJulgamento: '2023-01-30',
-      score: 0.74,
-      badge: 'media',
-      fonte: 'datajud_cnj',
-    },
-    {
-      id: 'ep006',
-      numero: '5067890-12.2022.3.00.0000',
-      ementa: 'CIVIL. Seguro. Acidente de trânsito. Indenização. DPVAT. Invalidez permanente. Cálculo. Tabela SUSEP. Interpretação. Recurso especial provido.',
-      tribunal: 'STJ',
-      relator: 'Min. Paulo de Tarso Sanseverino',
-      dataJulgamento: '2022-08-25',
-      score: 0.71,
-      badge: 'media',
-      fonte: 'datajud_cnj',
-    },
-  ]
+  // 2. Pinecone (vetorial, se configurado e DataJud vazio)
+  if (results.length === 0 && process.env.PINECONE_HOST && process.env.PINECONE_API_KEY) {
+    try {
+      const vector = await generateEmbedding(queryText)
+      const juriFilter = tribunal && tribunal !== 'TODOS' ? { tribunal: { $eq: tribunal } } : undefined
+      const globalNamespace = process.env.PINECONE_NAMESPACE?.trim() || ''
+      const legislacaoNamespace = process.env.PINECONE_LEGISLACAO_NAMESPACE?.trim() || 'legislacao'
+      const allMatches: Array<{ m: any; ns: string }> = []
 
-  const filtered = tribunal
-    ? mockResults.filter(result => result.tribunal.toUpperCase() === tribunal)
-    : mockResults
-  const output = filtered.slice(0, topK)
-  setCache(searchCache, cacheKey, output, SEARCH_CACHE_TTL_MS)
-  return output.map(r => ({ ...r }))
+      for (const ns of [namespace || '', globalNamespace].filter(Boolean)) {
+        const data = await queryPinecone(vector, topK, juriFilter, ns || undefined)
+        const matches = Array.isArray(data?.matches) ? data.matches : []
+        for (const m of matches) allMatches.push({ m, ns })
+      }
+      const legisData = await queryPinecone(vector, Math.min(topK, 4), undefined, legislacaoNamespace)
+      const legisMatches = Array.isArray(legisData?.matches) ? legisData.matches : []
+      for (const m of legisMatches) allMatches.push({ m, ns: legislacaoNamespace })
+
+      if (allMatches.length > 0) {
+        const seen = new Set<string>()
+        const mapped = allMatches
+          .sort((a, b) => (Number(b.m.score) || 0) - (Number(a.m.score) || 0))
+          .slice(0, topK)
+          .filter(({ m }) => {
+            const id = String(m.id || '')
+            if (seen.has(id)) return false
+            seen.add(id)
+            return true
+          })
+          .map(({ m }, i): EprocResult => {
+            const fonteRaw = m.metadata?.fonte as string | undefined
+            const fonte: 'datajud_cnj' | 'base_interna' | 'mock' =
+              fonteRaw === 'datajud_cnj' || fonteRaw === 'mock' ? fonteRaw : 'base_interna'
+            return {
+              id: String(m.id || `pc-${i}`),
+              numero: String(m.metadata?.numero || m.metadata?.processo || m.metadata?.titulo || ''),
+              ementa: String(m.metadata?.ementa || m.metadata?.texto || ''),
+              tribunal: String(m.metadata?.tribunal || ''),
+              relator: String(m.metadata?.relator || ''),
+              dataJulgamento: String(m.metadata?.dataJulgamento || ''),
+              score: Number(m.score || 0),
+              badge: scoreToBadge(Number(m.score || 0)),
+              fonte,
+            }
+          })
+        results = mapped
+      }
+    } catch (err) {
+      console.warn('[rag] pinecone query failed', err)
+    }
+  }
+
+  if (results.length > 0) {
+    setCache(searchCache, cacheKey, results, SEARCH_CACHE_TTL_MS)
+  }
+  return results.map(r => ({ ...r }))
 }
 
 // ─── 6. Reranking ─────────────────────────────────────────────────────────────

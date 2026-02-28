@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-import { normalizePlan, planForUserPlan } from '@/lib/plans'
+import { normalizePlan, planForUserPlan, todayDateKey } from '@/lib/plans'
 import Logo from '@/components/ui/Logo'
 import {
   LayoutDashboard, FileText, BookOpen,
@@ -84,7 +84,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* User block */}
         <div className="p-4 border-t border-brand-border space-y-2">
-          {(userData?.plano === 'trial' || userData?.plano === 'free') && (
+          {(normalizePlan(userData?.plano) === 'free') && (
             <button
               onClick={() => router.push('/dashboard/planos')}
               className="w-full flex items-center gap-2 px-3 py-2 bg-brand-gold/10 border border-brand-gold/25 rounded-lg hover:bg-brand-gold/15 transition-colors"
@@ -99,7 +99,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
           )}
 
-          {userData?.plano && userData?.plano !== 'trial' && userData?.plano !== 'free' && (
+          {userData?.plano && normalizePlan(userData?.plano) !== 'free' && (
             <button
               onClick={() => router.push('/dashboard/planos')}
               className="w-full flex items-center gap-2 px-3 py-2 bg-brand-indigo/10 border border-brand-indigo/25 rounded-lg hover:bg-brand-indigo/15 transition-colors"
@@ -107,7 +107,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <WalletCards size={14} className="text-brand-indigo" />
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-xs font-semibold text-brand-cream">{planLabel(userData?.plano)}</p>
-                <p className="text-xs text-brand-slate truncate">Clique para upgrade</p>
+                {(() => {
+                  const plan = planForUserPlan(userData?.plano)
+                  const today = todayDateKey()
+                  const used = Number(userData?.usageCounters?.[today]?.processesCreated || 0)
+                  const max = plan?.limits?.docsPerDay ?? 30
+                  const pct = max > 0 ? Math.min(100, (used / max) * 100) : 0
+                  return (
+                    <div className="mt-1.5 space-y-1">
+                      <div className="h-1.5 w-full bg-brand-navy rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-brand-indigo transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-brand-slate truncate">
+                        {used} / {max} documentos hoje
+                      </p>
+                    </div>
+                  )
+                })()}
               </div>
             </button>
           )}

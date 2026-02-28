@@ -5,12 +5,13 @@ import { useParams, useRouter } from 'next/navigation'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/lib/auth-context'
+import { normalizePlan } from '@/lib/plans'
 import type { Processo, EprocResult, AnalysisChunk, JurisprudenciaCriada } from '@/types'
 import EprocResultCard from '@/components/features/EprocResultCard'
 import {
   Sparkles, Save, CheckCircle, AlertCircle,
   ArrowLeft, FileText, Loader2, Cpu,
-  Shield, AlignLeft, Library, Database,
+  Shield, AlignLeft, Library, Database, Scale, BookOpen, Gavel,
 } from 'lucide-react'
 import { statusLabel, statusColor, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -28,7 +29,8 @@ const TRIBUNAL_OPTIONS = [
 export default function AnalisarPage() {
   const { id }    = useParams<{ id: string }>()
   const router    = useRouter()
-  const { user }  = useAuth()
+  const { user, userData }  = useAuth()
+  const isFreePlan = normalizePlan(userData?.plano) === 'free'
 
   const [processo, setProcesso]           = useState<Processo | null>(null)
   const [loading, setLoading]             = useState(true)
@@ -40,8 +42,12 @@ export default function AnalisarPage() {
   const [saving, setSaving]               = useState(false)
   const [toonValid, setToonValid]         = useState<boolean | null>(null)
   const [usedPareceres, setUsedPareceres] = useState<JurisprudenciaCriada[]>([])
-  const [leftTab, setLeftTab] = useState<'datajud' | 'pareceres'>('datajud')
+  const [leftTab, setLeftTab] = useState<'datajud' | 'bases_publicas' | 'codigo_penal' | 'constitucional' | 'pareceres'>('datajud')
   const [selectedTribunal, setSelectedTribunal] = useState('TJSP')
+  const [cfArticlesFromAnalysis, setCfArticlesFromAnalysis] = useState<Array<{ id: string; titulo: string; texto: string; aplicabilidade?: string }>>([])
+  const [basesPublicasFromAnalysis, setBasesPublicasFromAnalysis] = useState<Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }>>([])
+  const [codigoPenalFromAnalysis, setCodigoPenalFromAnalysis] = useState<Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }>>([])
+  const [geminiQuotaExceeded, setGeminiQuotaExceeded] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => { loadProcesso() }, [id])
@@ -73,6 +79,10 @@ export default function AnalisarPage() {
     setAnalyzing(true)
     setResults([])
     setJustificativas({})
+    setCfArticlesFromAnalysis([])
+    setBasesPublicasFromAnalysis([])
+    setCodigoPenalFromAnalysis([])
+    setGeminiQuotaExceeded(false)
     abortRef.current = new AbortController()
     const t0 = performance.now()
     let chunkCount = 0
@@ -88,8 +98,8 @@ export default function AnalisarPage() {
         body: JSON.stringify({
           processoId: id,
           texto: processo.textoOriginal,
-            tribunal: selectedTribunal,
-          expandScope: !!options?.expandScope,
+          tribunal: isFreePlan ? (processo.tribunal || 'TODOS') : selectedTribunal,
+          expandScope: isFreePlan ? false : !!options?.expandScope,
         }),
         signal: abortRef.current.signal,
       })
@@ -159,6 +169,13 @@ export default function AnalisarPage() {
         break
       case 'metadata':
         if (chunk.usedPareceres) setUsedPareceres(chunk.usedPareceres)
+        if ((chunk.data as any)?.cf_articles) setCfArticlesFromAnalysis((chunk.data as any).cf_articles)
+        if ((chunk.data as any)?.bases_publicas) setBasesPublicasFromAnalysis((chunk.data as any).bases_publicas)
+        if ((chunk.data as any)?.codigo_penal) setCodigoPenalFromAnalysis((chunk.data as any).codigo_penal)
+        if ((chunk.data as any)?.gemini_quota_exceeded) {
+          setGeminiQuotaExceeded(true)
+          toast.error('Limite da API Gemini atingido. As abas Bases, CP e CF/88 ficaram vazias. Aguarde alguns minutos ou verifique billing.', { duration: 6000 })
+        }
         break
       case 'justification':
         if ((chunk.data as any)?.id && chunk.text) {
@@ -297,9 +314,10 @@ export default function AnalisarPage() {
             )}
           </button>
           <button
-            onClick={() => startAnalysis({ expandScope: true })}
-            disabled={analyzing}
-            className="btn-ghost text-xs py-2 px-3"
+            onClick={() => !isFreePlan && startAnalysis({ expandScope: true })}
+            disabled={analyzing || isFreePlan}
+            title={isFreePlan ? 'Faça upgrade para ampliar tribunais' : undefined}
+            className={`text-xs py-2 px-3 ${isFreePlan ? 'opacity-50 cursor-not-allowed btn-ghost' : 'btn-ghost'}`}
           >
             Ampliar tribunais
           </button>
@@ -325,16 +343,22 @@ export default function AnalisarPage() {
             <div className="flex items-center gap-2">
               <Cpu size={14} className="text-brand-indigo" />
               <span className="font-body font-semibold text-brand-cream text-sm">Resultados DataJud CNJ</span>
-              <select
-                value={selectedTribunal}
-                onChange={e => setSelectedTribunal(e.target.value)}
-                className="bg-brand-navy border border-brand-border rounded-md text-[11px] text-brand-slate px-2 py-1"
-                disabled={analyzing}
-              >
-                {TRIBUNAL_OPTIONS.map(sigla => (
-                  <option key={sigla} value={sigla}>{sigla}</option>
-                ))}
-              </select>
+              {isFreePlan ? (
+                <span className="bg-brand-navy/50 border border-brand-border rounded-md text-[11px] text-brand-slate px-2 py-1 font-mono">
+                  {processo.tribunal || 'TODOS'}
+                </span>
+              ) : (
+                <select
+                  value={selectedTribunal}
+                  onChange={e => setSelectedTribunal(e.target.value)}
+                  className="bg-brand-navy border border-brand-border rounded-md text-[11px] text-brand-slate px-2 py-1"
+                  disabled={analyzing}
+                >
+                  {TRIBUNAL_OPTIONS.map(sigla => (
+                    <option key={sigla} value={sigla}>{sigla}</option>
+                  ))}
+                </select>
+              )}
               {results.length > 0 && (
                 <span className="bg-brand-indigo/20 text-brand-indigo text-xs px-2 py-0.5 rounded-full font-mono">
                   {results.length}
@@ -349,19 +373,37 @@ export default function AnalisarPage() {
             )}
           </div>
 
-	          <div className="px-4 pt-3">
-              <div className="grid grid-cols-2 gap-2">
+	          <div className="px-4 pt-3 space-y-3">
+              <div className="grid grid-cols-5 gap-1.5">
                 <button
                   onClick={() => setLeftTab('datajud')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold border ${leftTab === 'datajud' ? 'border-brand-indigo/40 bg-brand-indigo/15 text-brand-cream' : 'border-brand-border text-brand-slate hover:text-brand-cream'}`}
+                  className={`px-1.5 py-1.5 rounded-md text-[10px] font-semibold border ${leftTab === 'datajud' ? 'border-brand-indigo/40 bg-brand-indigo/15 text-brand-cream' : 'border-brand-border text-brand-slate hover:text-brand-cream'}`}
                 >
-                  <span className="inline-flex items-center gap-1.5"><Database size={12} /> DataJud CNJ</span>
+                  <span className="inline-flex items-center gap-0.5"><Database size={10} /> DataJud</span>
+                </button>
+                <button
+                  onClick={() => setLeftTab('bases_publicas')}
+                  className={`px-1.5 py-1.5 rounded-md text-[10px] font-semibold border ${leftTab === 'bases_publicas' ? 'border-brand-indigo/40 bg-brand-indigo/15 text-brand-cream' : 'border-brand-border text-brand-slate hover:text-brand-cream'}`}
+                >
+                  <span className="inline-flex items-center gap-0.5"><BookOpen size={10} /> Bases</span>
+                </button>
+                <button
+                  onClick={() => setLeftTab('codigo_penal')}
+                  className={`px-1.5 py-1.5 rounded-md text-[10px] font-semibold border ${leftTab === 'codigo_penal' ? 'border-brand-indigo/40 bg-brand-indigo/15 text-brand-cream' : 'border-brand-border text-brand-slate hover:text-brand-cream'}`}
+                >
+                  <span className="inline-flex items-center gap-0.5"><Gavel size={10} /> CP</span>
+                </button>
+                <button
+                  onClick={() => setLeftTab('constitucional')}
+                  className={`px-1.5 py-1.5 rounded-md text-[10px] font-semibold border ${leftTab === 'constitucional' ? 'border-brand-indigo/40 bg-brand-indigo/15 text-brand-cream' : 'border-brand-border text-brand-slate hover:text-brand-cream'}`}
+                >
+                  <span className="inline-flex items-center gap-0.5"><Scale size={10} /> CF/88</span>
                 </button>
                 <button
                   onClick={() => setLeftTab('pareceres')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold border ${leftTab === 'pareceres' ? 'border-brand-indigo/40 bg-brand-indigo/15 text-brand-cream' : 'border-brand-border text-brand-slate hover:text-brand-cream'}`}
+                  className={`px-1.5 py-1.5 rounded-md text-[10px] font-semibold border ${leftTab === 'pareceres' ? 'border-brand-indigo/40 bg-brand-indigo/15 text-brand-cream' : 'border-brand-border text-brand-slate hover:text-brand-cream'}`}
                 >
-                  <span className="inline-flex items-center gap-1.5"><Library size={12} /> Pareceres já utilizados</span>
+                  <span className="inline-flex items-center gap-0.5"><Library size={10} /> Pareceres</span>
                 </button>
               </div>
             </div>
@@ -406,6 +448,159 @@ export default function AnalisarPage() {
 	              />
 	            ))}
               </>
+            )}
+
+            {leftTab === 'bases_publicas' && (
+              <div className="space-y-3 px-4 pb-4">
+                {basesPublicasFromAnalysis.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="font-body text-xs font-semibold text-brand-gold">
+                      Bases públicas – legislação, súmulas, jurisprudência consolidada
+                    </p>
+                    {basesPublicasFromAnalysis.map(bp => (
+                      <div key={bp.id} className="card p-4 space-y-2 border border-brand-indigo/20">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-body text-sm font-semibold text-brand-cream">{bp.fonte}</p>
+                          <span className="badge-media text-[10px]">{bp.tipo}</span>
+                        </div>
+                        <p className="font-body text-brand-slate text-xs line-clamp-3">{bp.ementa}</p>
+                        {bp.aplicabilidade && (
+                          <p className="font-body text-brand-gold text-xs italic">{bp.aplicabilidade}</p>
+                        )}
+                        <button
+                          onClick={() => insertText(`[${bp.fonte}]\n${bp.ementa}\n${bp.aplicabilidade ? `Aplicabilidade: ${bp.aplicabilidade}\n` : ''}\n`)}
+                          className="btn-ghost text-xs py-1.5 px-2"
+                        >
+                          Inserir no editor
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-4 text-center py-12">
+                    <div className="w-14 h-14 rounded-2xl bg-brand-indigo/10 border border-brand-indigo/20 flex items-center justify-center">
+                      <BookOpen size={24} className="text-brand-indigo" />
+                    </div>
+                    <div>
+                      <p className="font-body font-semibold text-brand-cream text-sm">Bases públicas</p>
+                      {geminiQuotaExceeded ? (
+                        <p className="font-body text-amber-400 text-xs mt-1 max-w-xs">
+                          Limite da API Gemini atingido. Aguarde alguns minutos ou verifique billing em <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev</a>.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
+                            Execute a análise para que a IA pesquise legislação, súmulas e jurisprudência consolidada relevantes ao processo.
+                          </p>
+                          <div className="flex flex-wrap justify-center gap-2 mt-3">
+                            <a href="https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-indigo hover:underline">CF/88</a>
+                            <a href="https://www2.senado.leg.br/bdsf/bitstream/handle/id/608973/Codigo_penal_6ed.pdf?sequence=1&isAllowed=y" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-indigo hover:underline">Código Penal</a>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {leftTab === 'codigo_penal' && (
+              <div className="space-y-3 px-4 pb-4">
+                {codigoPenalFromAnalysis.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="font-body text-xs font-semibold text-brand-gold">
+                      Artigos do Código Penal aplicáveis ao processo (IA analisou o processo e o CP)
+                    </p>
+                    {codigoPenalFromAnalysis.map(cp => (
+                      <div key={cp.id} className="card p-4 space-y-2 border border-brand-indigo/20">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-body text-sm font-semibold text-brand-cream">{cp.fonte}</p>
+                          <span className="badge-media text-[10px]">{cp.tipo}</span>
+                        </div>
+                        <p className="font-body text-brand-slate text-xs line-clamp-3">{cp.ementa}</p>
+                        {cp.aplicabilidade && (
+                          <p className="font-body text-brand-gold text-xs italic">{cp.aplicabilidade}</p>
+                        )}
+                        <button
+                          onClick={() => insertText(`[${cp.fonte}]\n${cp.ementa}\n${cp.aplicabilidade ? `Aplicabilidade: ${cp.aplicabilidade}\n` : ''}\n`)}
+                          className="btn-ghost text-xs py-1.5 px-2"
+                        >
+                          Inserir no editor
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-4 text-center py-12">
+                    <div className="w-14 h-14 rounded-2xl bg-brand-indigo/10 border border-brand-indigo/20 flex items-center justify-center">
+                      <Gavel size={24} className="text-brand-indigo" />
+                    </div>
+                    <div>
+                      <p className="font-body font-semibold text-brand-cream text-sm">Código Penal</p>
+                      {geminiQuotaExceeded ? (
+                        <p className="font-body text-amber-400 text-xs mt-1 max-w-xs">
+                          Limite da API Gemini atingido. Aguarde alguns minutos ou verifique billing em <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev</a>.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
+                            Execute a análise para que a IA identifique os artigos do CP aplicáveis ao processo.
+                          </p>
+                          <a href="https://www2.senado.leg.br/bdsf/bitstream/handle/id/608973/Codigo_penal_6ed.pdf?sequence=1&isAllowed=y" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-indigo hover:underline mt-2 inline-block">Código Penal (Senado)</a>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {leftTab === 'constitucional' && (
+              <div className="space-y-3 px-4 pb-4">
+                {cfArticlesFromAnalysis.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="font-body text-xs font-semibold text-brand-gold">
+                      Artigos da CF/88 aplicáveis ao processo (IA analisou o processo e a Constituição)
+                    </p>
+                    {cfArticlesFromAnalysis.map(art => (
+                      <div key={art.id} className="card p-4 space-y-2 border border-brand-gold/30">
+                        <p className="font-body text-sm font-semibold text-brand-cream">{art.titulo}</p>
+                        {art.aplicabilidade && (
+                          <p className="font-body text-brand-gold text-xs italic">{art.aplicabilidade}</p>
+                        )}
+                        {art.texto && <p className="font-body text-brand-slate text-xs line-clamp-3">{art.texto}</p>}
+                        <button
+                          onClick={() => insertText(`[${art.titulo}]\n${art.texto || ''}\n${art.aplicabilidade ? `Aplicabilidade: ${art.aplicabilidade}\n` : ''}\n`)}
+                          className="btn-ghost text-xs py-1.5 px-2"
+                        >
+                          Inserir no editor
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-4 text-center py-12">
+                    <div className="w-14 h-14 rounded-2xl bg-brand-gold/10 border border-brand-gold/20 flex items-center justify-center">
+                      <Scale size={24} className="text-brand-gold" />
+                    </div>
+                    <div>
+                      <p className="font-body font-semibold text-brand-cream text-sm">Artigos da CF/88 aplicáveis</p>
+                      {geminiQuotaExceeded ? (
+                        <p className="font-body text-amber-400 text-xs mt-1 max-w-xs">
+                          Limite da API Gemini atingido. Aguarde alguns minutos ou verifique billing em <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev</a>.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
+                            Execute a análise para que a IA identifique, com base no processo e na Constituição (Planalto), quais artigos se enquadram.
+                          </p>
+                          <a href="https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-gold hover:underline mt-2 inline-block">Constituição Federal (Planalto)</a>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {leftTab === 'pareceres' && (

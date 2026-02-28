@@ -56,14 +56,16 @@ cp .env.local.example .env.local
 
 ### 3. Configure Firebase
 1. Crie um projeto em [firebase.google.com](https://firebase.google.com)
-2. Ative: **Authentication** (Email/Password + Google), **Firestore**, **Storage**
+2. Ative: **Authentication** (Email/Password + Google), **Firestore**, **Storage** (opcional)
 3. Copie as credenciais do SDK para `.env.local`
+4. **Sem Firebase Storage?** Defina `NEXT_PUBLIC_SKIP_FIREBASE_STORAGE=true` – o processo salva apenas o texto extraído do PDF. Alternativas: Supabase Storage, Vercel Blob, Cloudflare R2.
 4. Implante as regras: `firebase deploy --only firestore:rules`
 5. Crie os índices: `firebase deploy --only firestore:indexes`
 
-### 4. Configure Gemini
+### 4. Configure Gemini (SDK @google/genai)
 - Obtenha uma API Key em [Google AI Studio](https://aistudio.google.com/app/apikey)
 - Adicione em `GEMINI_API_KEY`
+- **Instale o SDK**: `npm install @google/genai` (mesmo padrão do projeto semantic_agent)
 - Modelos padrão:
   - `AI_CHAT_MODEL=gemini-2.0-flash`
   - `AI_EMBEDDING_MODEL=text-embedding-004`
@@ -82,11 +84,25 @@ npm run dev
 
 Acesse: [http://localhost:3000](http://localhost:3000)
 
-### 7. Ingestão DataJud CNJ -> Pinecone (MVP)
-1. Solicite sua chave da API Pública DataJud (CNJ) e preencha:
-   - `DATAJUD_API_KEY`
-   - `PINECONE_API_KEY`
-   - `PINECONE_HOST`
+### 7. DataJud CNJ (API Pública)
+
+**DataJud – apenas URL e API Key**: A autenticação usa `Authorization: APIKey [Chave Pública]`. Não é necessária outra chave. Configure:
+
+- `DATAJUD_API_KEY` – Chave Pública disponível na [Wiki DataJud](https://datajud-wiki.cnj.jus.br/)
+- `DATAJUD_BASE_URL` – Opcional; padrão: `https://api-publica.datajud.cnj.jus.br`
+
+**Fluxo RAG (sem mock)**: Upload PDF → extração de metadados (LLM) → busca jurisprudência (DataJud API como fonte principal; Pinecone opcional se configurado) → rerank → CF/88 do Planalto (IA identifica artigos aplicáveis) → TOON → justificativa LLM. Guard rails: `isLegalScopeText`. Temperatura 0.1, top_p 0.6, top 6–8 resultados.
+
+**Tribunais**: Selecione um tribunal (ex.: TJSC, TJSP) – obrigatório para DataJud. A UI usa siglas; o DataJud usa aliases (`api_publica_tjsc`, `api_publica_tjsp`, etc.). Para "TODOS", apenas Pinecone é consultado.
+
+**Arquitetura recomendada**:
+- **Aba DataJud**: jurisprudência da API DataJud (busca full-text + fallback: últimos processos do tribunal)
+- **Aba CF/88**: artigos constitucionais aplicáveis (Planalto + IA)
+- **Aba Pareceres**: jurisprudências já salvas pelo usuário em Firestore
+- **LLM**: temperatura 0.1, top_p 0.6 (respostas determinísticas)
+
+**Ingestão opcional (Pinecone)**: Se quiser busca vetorial em vez de full-text:
+1. Preencha `PINECONE_API_KEY` e `PINECONE_HOST`
 2. Crie o índice Pinecone com dimensão compatível ao embedding (`text-embedding-004`).
 3. Rode a aplicação (`npm run dev`).
 4. Execute uma ingestão inicial via HTTP:
@@ -106,9 +122,23 @@ curl -X POST http://localhost:3000/api/admin/datajud-ingest \
 ```
 5. Após ingestão, a busca da análise usa o Pinecone com metadados `fonte=datajud_cnj`.
 
+**Ingestão CF/88 e Código Penal (Pinecone)**: Para injetar Constituição Federal e Código Penal no namespace de legislação:
+
+1. Configure `PINECONE_LEGISLACAO_NAMESPACE=legislacao` em `.env.local` (opcional; padrão: `legislacao`).
+2. Execute:
+```bash
+curl -X POST http://localhost:3000/api/admin/legislacao-ingest \
+  -H "Authorization: Bearer <firebase_id_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"fonte":"ambos"}'
+```
+3. Parâmetros: `fonte` = `"cf"` | `"cp"` | `"ambos"` (padrão: ambos); `dryRun: true` para validar sem gravar.
+4. A busca RAG consulta o namespace de legislação quando Pinecone está configurado (ex.: DataJud vazio).
+
 Observações:
 - Use `dryRun: true` para validar sem gravar vetores.
 - Respeite limites e termos do DataJud/CNJ; ajuste `DATAJUD_REQUEST_DELAY_MS` para reduzir pressão na API pública.
+- **DataJud é a fonte principal** quando tribunal está selecionado; Pinecone é usado apenas se configurado e DataJud retornar vazio.
 - Namespace por cliente:
   - Se enviar `namespace`, ele será usado.
   - Se enviar `userId`, o sistema gera automaticamente `cli-<userId-sanitizado>`.

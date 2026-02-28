@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchDataJudProcessos } from '@/lib/datajud'
+import { fetchDataJudProcessos, siglaToDataJudAlias } from '@/lib/datajud'
 import { chunkText, generateEmbedding } from '@/lib/rag'
 import { upsertPinecone } from '@/lib/pinecone'
 import { namespaceForUser } from '@/lib/tenant'
@@ -10,7 +10,8 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 type IngestBody = {
-  tribunalAlias: string
+  tribunalAlias?: string
+  tribunalSigla?: string
   size?: number
   dateFrom?: string
   dateTo?: string
@@ -36,9 +37,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = (await req.json()) as IngestBody
-    const tribunalAlias = body?.tribunalAlias?.trim()
+    const explicitAlias = body?.tribunalAlias?.trim()
+    const sigla = body?.tribunalSigla?.trim().toUpperCase()
+    const tribunalAlias = explicitAlias || (sigla ? siglaToDataJudAlias(sigla) : undefined)
     if (!tribunalAlias) {
-      return NextResponse.json({ error: 'tribunalAlias is required.' }, { status: 400 })
+      return NextResponse.json({
+        error: 'tribunalAlias ou tribunalSigla é obrigatório (ex: tribunalSigla: "TJSP").',
+      }, { status: 400 })
     }
 
     const size = Math.min(Math.max(Number(body.size || 20), 1), 100)

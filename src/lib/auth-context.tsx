@@ -13,7 +13,7 @@ import {
   deleteUser,
   getAdditionalUserInfo,
 } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import type { User } from '@/types'
 import { normalizePlan, PlanId } from '@/lib/plans'
@@ -46,22 +46,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubUser: (() => void) | null = null
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser)
+      if (unsubUser) {
+        unsubUser()
+        unsubUser = null
+      }
       if (firebaseUser) {
         const ref = doc(db, 'users', firebaseUser.uid)
-        const snap = await getDoc(ref)
-        if (snap.exists()) {
-          setUserData(snap.data() as User)
-        }
+        unsubUser = onSnapshot(ref, (snap) => {
+          if (snap.exists()) setUserData(snap.data() as User)
+          else setUserData(null)
+        })
+        setLoading(false)
+        clearTimeout(fallbackTimer)
       } else {
         setUserData(null)
+        setLoading(false)
+        clearTimeout(fallbackTimer)
       }
-      setLoading(false)
-      clearTimeout(fallbackTimer)
     })
     return () => {
       clearTimeout(fallbackTimer)
+      if (unsubUser) unsubUser()
       unsub()
     }
   }, [])

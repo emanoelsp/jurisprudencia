@@ -112,10 +112,10 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
 export function normalizePlan(input: string | undefined | null): PlanId {
   const raw = String(input || '').toLowerCase().replace(/\s+/g, '')
   if (raw === 'trial' || raw === 'free') return 'free'
-  if (raw === 'plano1') return 'plano1'
-  if (raw === 'plano2') return 'plano2'
+  if (raw === 'plano1' || raw === 'starter') return 'plano1'
+  if (raw === 'plano2' || raw === 'pro') return 'plano2'
   if (raw === 'escritorio') return 'escritorio'
-  if (raw === 'start') return 'start'
+  if (raw === 'start' || raw === 'enterprise') return 'start'
   return 'free'
 }
 

@@ -126,8 +126,9 @@ export default function ProcessosPage() {
       let storageUrl = ''
       let storagePath = ''
 
-      // Upload PDF to Firebase Storage
-      if (pdfFile) {
+      // Upload PDF (pula se SKIP_FIREBASE_STORAGE=true ou Storage indisponível)
+      const skipStorage = process.env.NEXT_PUBLIC_SKIP_FIREBASE_STORAGE === 'true'
+      if (pdfFile && !skipStorage) {
         const tUpload = performance.now()
         console.log('[save-processo] upload start', { sizeBytes: pdfFile.size, type: pdfFile.type })
         try {
@@ -140,14 +141,14 @@ export default function ProcessosPage() {
             console.log('[save-processo] storage URL generated')
           } catch (readErr: any) {
             console.error('[save-processo] getDownloadURL failed', readErr)
-            toast.error(`Upload ok, mas sem URL pública (${readErr?.code || 'erro de leitura'}).`)
           }
         } catch (uploadErr) {
           const message = (uploadErr as any)?.code || (uploadErr as any)?.message || 'erro desconhecido'
-          console.error('[save-processo] upload failed, continuando sem anexo', uploadErr)
-          toast.error(`Falha no upload do PDF (${message}). Processo será salvo sem anexo.`)
-          storageUrl = ''
+          console.warn('[save-processo] upload failed, salvando sem anexo', message)
+          toast.success('Processo salvo sem PDF (Storage indisponível). O texto extraído foi armazenado.')
         }
+      } else if (pdfFile && skipStorage) {
+        toast.success('Processo salvo. PDF não armazenado (modo sem Storage).')
       }
 
       const processo: Omit<Processo, 'id'> = {

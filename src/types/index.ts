@@ -84,6 +84,10 @@ export interface AnalysisChunk {
     retrieval_confidence?: number
     evidence_coverage?: number
     generation_risk?: number
+    cf_articles?: Array<{ id: string; titulo: string; texto: string; aplicabilidade?: string }>
+    bases_publicas?: Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }>
+    codigo_penal?: Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }>
+    gemini_quota_exceeded?: boolean
   }
   results?: EprocResult[]
   usedPareceres?: JurisprudenciaCriada[]

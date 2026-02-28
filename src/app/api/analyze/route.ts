@@ -7,7 +7,9 @@ import {
   rerankResults,
   enrichWithToon,
   dedupeEprocResults,
+  generateEmbedding,
 } from '@/lib/rag'
+import { queryPinecone } from '@/lib/pinecone'
 import {
   serializeToonForPrompt,
   validateToonIntegrity,
@@ -17,14 +19,87 @@ import { isLegalScopeText, parseJustificationJson } from '@/lib/guards'
 import { namespaceForUser } from '@/lib/tenant'
 import { requireServerAuth } from '@/lib/server-auth'
 import { normalizePlan, planForUserPlan } from '@/lib/plans'
+import { fetchCfPlanalto, getArtigoResumoParaIA } from '@/lib/cf-planalto'
+import { ARTIGOS_CONSTITUCIONAIS } from '@/lib/artigos-constitucionais'
+import { getCodigoPenalResumoParaIA } from '@/lib/codigo-penal'
+import { BASES_PUBLICAS_SYSTEM, BASES_PUBLICAS_FEW_SHOT, BASES_PUBLICAS_USER_PREFIX } from '@/lib/prompts/bases-publicas'
+import { parseToonBasesPublicas } from '@/lib/toon-bases-publicas'
+import { parseToonCf } from '@/lib/toon-cf'
 import type { AnalysisChunk } from '@/types'
+
+function parseBasesPublicasResponse(raw: string): Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }> {
+  const toonResults = parseToonBasesPublicas(raw)
+  if (toonResults.length > 0) return toonResults
+  try {
+    let str = (raw || '').trim()
+    const codeMatch = str.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeMatch) str = codeMatch[1].trim()
+    const json = JSON.parse(str)
+    const arr = Array.isArray(json.resultados) ? json.resultados
+      : Array.isArray(json.results) ? json.results
+      : Array.isArray(json.precedentes) ? json.precedentes
+      : []
+    return arr.slice(0, 6).map((r: any, i: number) => ({
+      id: String(r.id || `bp-${i}`),
+      tipo: String(r.tipo || 'jurisprudencia'),
+      fonte: String(r.fonte || r.fonteNorma || r.nome || r.tipo || 'Norma/Precedente'),
+      ementa: String(r.ementa || r.resumo || r.texto || r.descricao || ''),
+      aplicabilidade: r.aplicabilidade,
+    })).filter((r: any) => r.ementa && r.ementa.length > 10)
+  } catch (e) {
+    console.warn('[analyze] parseBasesPublicasResponse JSON fallback failed', e)
+    return []
+  }
+}
+
+function normalizeArtRef(s: string): string {
+  return (s || '').toLowerCase().replace(/[ºª]/g, '').replace(/\s+/g, ' ').trim()
+}
+
+function parseCfArtigosResponse(raw: string, arts: { id: string; titulo: string; texto: string }[]): Array<{ id: string; titulo: string; texto: string; aplicabilidade?: string }> {
+  const toonResults = parseToonCf(raw, arts)
+  if (toonResults.length > 0) return toonResults
+  try {
+    let str = (raw || '').trim()
+    const codeMatch = str.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeMatch) str = codeMatch[1].trim()
+    const json = JSON.parse(str)
+    const arr = Array.isArray(json.artigos) ? json.artigos
+      : Array.isArray(json.artigos_aplicaveis) ? json.artigos_aplicaveis
+      : Array.isArray(json.resultados) ? json.resultados
+      : []
+    return arr.slice(0, 5).map((a: any) => {
+      const titulo = String(a.titulo || a.id || '')
+      const numMatch = titulo.match(/art\.?\s*(\d+)/i) || (a.id || '').match(/(\d+)/)
+      const num = numMatch?.[1] || ''
+      const id = String(a.id || '').replace(/[^a-z0-9-]/gi, '-').toLowerCase() || `art-${num}`
+      const titNorm = normalizeArtRef(titulo)
+      const orig = arts.find(x => {
+        if (x.id === id || x.id.includes(id)) return true
+        const xNorm = normalizeArtRef(x.titulo)
+        if (xNorm.includes(titNorm) || titNorm.includes(xNorm)) return true
+        if (num && x.titulo.includes(num)) return true
+        return false
+      })
+      return {
+        id: orig?.id || id,
+        titulo: orig?.titulo || titulo,
+        texto: orig?.texto || '',
+        aplicabilidade: a.aplicabilidade,
+      }
+    }).filter((a: any) => a.titulo && a.titulo.length > 3)
+  } catch (e) {
+    console.warn('[analyze] parseCfArtigosResponse JSON fallback failed', e)
+    return []
+  }
+}
 
 export const runtime    = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const DEFAULT_TOP_RESULTS = 3
-const MAX_TOP_RESULTS = 5
+const DEFAULT_TOP_RESULTS = 6
+const MAX_TOP_RESULTS = 8
 const MAX_STREAM_RETRIES = 3
 const RETRY_BASE_MS = 1200
 const DEFAULT_MIN_CONFIDENCE = 0.65
@@ -34,6 +109,99 @@ const MIN_EVIDENCE_COVERAGE = 0.45
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/** Extrai referência de artigo (ex: "Art. 138" -> "138", "Art. 5º" -> "5") */
+function extractArticleRef(tituloOuFonte: string): string[] {
+  const s = String(tituloOuFonte || '').replace(/[ºª]/g, '')
+  const nums = Array.from(s.matchAll(/\bArt\.?\s*(\d+)|art\.?\s*(\d+)|§\s*(\d+)|inciso\s*(\d+)/gi))
+    .flatMap(m => [m[1], m[2], m[3], m[4]].filter(Boolean))
+  if (nums.length > 0) return nums
+  const single = s.match(/\b(\d{1,4})\b/)
+  return single ? [single[1]] : []
+}
+
+/** Valida artigos Gemini com resultados RAG (Pinecone legislação). Retorna apenas os validados. */
+async function validateLegislacaoComRag(
+  texto: string,
+  cfArticles: Array<{ id: string; titulo: string; texto: string; aplicabilidade?: string }>,
+  codigoPenal: Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }>
+): Promise<{ cf: typeof cfArticles; cp: typeof codigoPenal }> {
+  const legislacaoNs = process.env.PINECONE_LEGISLACAO_NAMESPACE?.trim() || 'legislacao'
+  if (!process.env.PINECONE_API_KEY || !process.env.PINECONE_HOST) {
+    return { cf: cfArticles, cp: codigoPenal }
+  }
+  try {
+    const vector = await generateEmbedding(texto.slice(0, 4000))
+    const [cfData, cpData] = await Promise.all([
+      queryPinecone(vector, 10, { fonte: { $eq: 'cf_88' } }, legislacaoNs),
+      queryPinecone(vector, 10, { fonte: { $eq: 'codigo_penal' } }, legislacaoNs),
+    ])
+    const ragCfTitulos = new Set(
+      (cfData?.matches ?? []).map((m: any) => String(m.metadata?.titulo || m.metadata?.numero || '')).filter(Boolean)
+    )
+    const ragCpTitulos = new Set(
+      (cpData?.matches ?? []).map((m: any) => String(m.metadata?.titulo || m.metadata?.numero || '')).filter(Boolean)
+    )
+    const cfValidados =
+      ragCfTitulos.size === 0
+        ? cfArticles
+        : cfArticles.filter(a => {
+            const refs = extractArticleRef(a.titulo)
+            if (refs.length === 0) return true
+            for (const t of Array.from(ragCfTitulos)) {
+              if (refs.some(r => t.includes(r) || t.includes(`Art. ${r}`) || t.includes(`Art.${r}`))) return true
+            }
+            return false
+          })
+    const cpValidados =
+      ragCpTitulos.size === 0
+        ? codigoPenal
+        : codigoPenal.filter(a => {
+            const refs = extractArticleRef(a.fonte || a.ementa)
+            if (refs.length === 0) return true
+            for (const t of Array.from(ragCpTitulos)) {
+              if (refs.some(r => t.includes(r) || t.includes(`Art. ${r}`) || t.includes(`Art.${r}`))) return true
+            }
+            return false
+          })
+    if (cfValidados.length < cfArticles.length || cpValidados.length < codigoPenal.length) {
+      console.log('[analyze] RAG validation', {
+        cfBefore: cfArticles.length,
+        cfAfter: cfValidados.length,
+        cpBefore: codigoPenal.length,
+        cpAfter: cpValidados.length,
+      })
+    }
+    return { cf: cfValidados, cp: cpValidados }
+  } catch (err) {
+    console.warn('[analyze] RAG validation failed, returning Gemini-only', err)
+    return { cf: cfArticles, cp: codigoPenal }
+  }
+}
+
+/** Chama Gemini com retry em 429 (quota). Aguarda 4s e tenta 1x. */
+async function callGeminiWithRetry<T>(
+  fn: () => Promise<T>,
+  on429?: () => void
+): Promise<{ ok: true; data: T } | { ok: false; quotaExceeded: boolean }> {
+  try {
+    const data = await fn()
+    return { ok: true, data }
+  } catch (err: any) {
+    const is429 = err?.status === 429 || err?.statusCode === 429
+    if (is429) on429?.()
+    if (is429) {
+      await sleep(4000)
+      try {
+        const data = await fn()
+        return { ok: true, data }
+      } catch {
+        return { ok: false, quotaExceeded: true }
+      }
+    }
+    throw err
+  }
 }
 
 function resolveTopResults(input: unknown): number {
@@ -235,6 +403,134 @@ export async function POST(req: NextRequest) {
         )
         send({ type: 'metadata', usedPareceres })
 
+        let geminiQuotaExceeded = false
+        const mark429 = () => { geminiQuotaExceeded = true }
+
+        // ─── Step 0a: Bases Públicas (IA) – TOON como semantic_agent, sem response_format ─
+        const basesPublicasPromise = (async () => {
+          try {
+            const cpResumo = getCodigoPenalResumoParaIA(4000)
+            const systemContent = BASES_PUBLICAS_SYSTEM + '\n\n' + BASES_PUBLICAS_FEW_SHOT +
+              '\n\nOBRIGATÓRIO: Retorne ao menos 1 bloco ⟨BP⟩...⟨/BP⟩. Se o processo for jurídico, cite artigos do CP, CF, CDC, súmulas ou jurisprudência relevante.'
+            const userContent = BASES_PUBLICAS_USER_PREFIX + texto.slice(0, 2800) +
+              (cpResumo ? `\n\nREFERÊNCIA - Código Penal (artigos principais):\n${cpResumo}\n\nUse os artigos acima quando aplicáveis.` : '')
+
+            const result = await callGeminiWithRetry(
+              () => aiClient.chat.completions.create({
+                model: aiModels.chat,
+                temperature: 0.1,
+                top_p: 0.6,
+                max_tokens: 1200,
+                messages: [
+                  { role: 'system', content: systemContent },
+                  { role: 'user', content: userContent },
+                ],
+              }),
+              mark429
+            )
+            if (!result.ok) return []
+            const raw = result.data.choices?.[0]?.message?.content || ''
+            const parsed = parseBasesPublicasResponse(raw)
+            if (parsed.length > 0) console.log('[analyze] bases-publicas OK', { count: parsed.length })
+            else if (raw && raw.length > 20) console.warn('[analyze] bases-publicas parse empty', { rawLen: raw.length })
+            return parsed
+          } catch (err) {
+            console.warn('[analyze] bases-publicas step failed', err)
+            return []
+          }
+        })()
+
+        // ─── Step 0b: Código Penal – análise dedicada (IA) – TOON ⟨BP⟩...⟨/BP⟩ ─
+        const codigoPenalPromise = (async () => {
+          try {
+            const cpResumo = getCodigoPenalResumoParaIA(6000)
+            if (!cpResumo) return []
+            const result = await callGeminiWithRetry(
+              () => aiClient.chat.completions.create({
+                model: aiModels.chat,
+                temperature: 0.1,
+                top_p: 0.6,
+                max_tokens: 800,
+                messages: [
+                  {
+                    role: 'system',
+                    content: `Você é um especialista em direito penal. Dado um processo judicial e uma lista de artigos do Código Penal (CP), identifique quais artigos se aplicam ao caso.
+
+FORMATO DE RESPOSTA OBRIGATÓRIO - TOON:
+Para cada artigo aplicável: ⟨BP⟩⟨F:Código Penal - Art. X⟩⟨T:lei⟩⟨E:texto ou resumo do artigo⟩⟨A:aplicabilidade ao caso⟩⟨/BP⟩
+Exemplo: ⟨BP⟩⟨F:Código Penal - Art. 138⟩⟨T:lei⟩⟨E:Calúnia - imputar falsamente fato definido como crime⟩⟨A:Enquadramento em crime contra honra se houver imputação falsa de crime⟩⟨/BP⟩
+
+OBRIGATÓRIO: Retorne ao menos 1 bloco ⟨BP⟩...⟨/BP⟩ quando houver matéria penal. Máximo 5 blocos. Liste apenas artigos efetivamente aplicáveis.`,
+                  },
+                  {
+                    role: 'user',
+                    content: `PROCESSO:\n${texto.slice(0, 2800)}\n\nARTIGOS DO CÓDIGO PENAL:\n${cpResumo}\n\nIdentifique os artigos do CP aplicáveis e retorne no formato TOON ⟨BP⟩...⟨/BP⟩.`,
+                  },
+                ],
+              }),
+              mark429
+            )
+            if (!result.ok) return []
+            const raw = result.data.choices?.[0]?.message?.content || ''
+            const parsed = parseBasesPublicasResponse(raw)
+            const cpOnly = parsed.filter(p => (p.fonte || '').toLowerCase().includes('código penal') || (p.fonte || '').toLowerCase().includes('codigo penal'))
+            if (cpOnly.length > 0) console.log('[analyze] codigo-penal OK', { count: cpOnly.length })
+            return cpOnly.length > 0 ? cpOnly : parsed
+          } catch (err) {
+            console.warn('[analyze] codigo-penal step failed', err)
+            return []
+          }
+        })()
+
+        // ─── Step 0c: CF/88 – TOON como semantic_agent, sem response_format ─
+        const cfPromise = (async () => {
+          try {
+            let arts = await fetchCfPlanalto()
+            if (arts.length < 10) {
+              const extra = ARTIGOS_CONSTITUCIONAIS.map(a => ({ id: a.id, titulo: a.titulo, texto: a.texto }))
+              const seen = new Set(arts.map(a => a.id))
+              for (const a of extra) {
+                if (!seen.has(a.id)) { arts = [...arts, a]; seen.add(a.id) }
+              }
+            }
+            if (arts.length === 0) return []
+            const resumo = getArtigoResumoParaIA(arts, 8000)
+            const result = await callGeminiWithRetry(
+              () => aiClient.chat.completions.create({
+                model: aiModels.chat,
+                temperature: 0.1,
+                top_p: 0.6,
+                max_tokens: 600,
+                messages: [
+                  {
+                    role: 'system',
+                    content: `Você é um especialista em direito constitucional. Dado um processo judicial e uma lista de artigos da CF/88, identifique quais artigos se aplicam ao caso.
+
+FORMATO DE RESPOSTA OBRIGATÓRIO - TOON:
+Para cada artigo: ⟨CF⟩⟨ID:art-X⟩⟨TIT:Art. X⟩⟨APLIC:explicação breve⟩⟨/CF⟩
+Exemplo: ⟨CF⟩⟨ID:art-5⟩⟨TIT:Art. 5º, XXXV⟩⟨APLIC:Inafastabilidade da jurisdição - acesso ao Judiciário⟩⟨/CF⟩
+
+NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...⟨/CF⟩. Liste de 1 a 5 artigos relevantes.`,
+                  },
+                  {
+                    role: 'user',
+                    content: `PROCESSO:\n${texto.slice(0, 2500)}\n\nARTIGOS CF/88:\n${resumo}\n\nIdentifique os artigos aplicáveis e retorne no formato TOON.`,
+                  },
+                ],
+              }),
+              mark429
+            )
+            if (!result.ok) return []
+            const raw = result.data.choices?.[0]?.message?.content || ''
+            const parsed = parseCfArtigosResponse(raw, arts)
+            if (parsed.length > 0) console.log('[analyze] cf-planalto OK', { count: parsed.length })
+            return parsed
+          } catch (err) {
+            console.warn('[analyze] cf-planalto step failed', err)
+            return []
+          }
+        })()
+
         // ─── Step 1: Vector Search ───────────────────────
         const tSearch = Date.now()
         const rawResults = await searchEproc(
@@ -251,7 +547,7 @@ export async function POST(req: NextRequest) {
         send({
           type: 'metadata',
           data: {
-            rag_source: rawResults.some(r => r.fonte === 'base_interna') ? 'pinecone' : 'fallback_mock',
+            rag_source: rawResults.some(r => r.fonte === 'base_interna') ? 'pinecone' : 'datajud_cnj',
           } as any,
         })
 
@@ -296,6 +592,11 @@ export async function POST(req: NextRequest) {
             shouldExpandScope,
           })
           send({ type: 'results', results: [] })
+          const [cfArticlesEarly, basesPublicasEarly, codigoPenalEarly] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
+          const { cf: cfValidadosEarly, cp: cpValidadosEarly } = await validateLegislacaoComRag(texto, cfArticlesEarly, codigoPenalEarly)
+          if (cfValidadosEarly.length > 0 || basesPublicasEarly.length > 0 || cpValidadosEarly.length > 0) {
+            send({ type: 'metadata', data: { cf_articles: cfValidadosEarly, bases_publicas: basesPublicasEarly, codigo_penal: cpValidadosEarly, gemini_quota_exceeded: geminiQuotaExceeded } as any })
+          }
           send({
             type: 'error',
             error: shouldExpandScope
@@ -313,6 +614,11 @@ export async function POST(req: NextRequest) {
             evidenceCoverage,
           })
           send({ type: 'results', results: topRanked })
+          const [cfArticlesAbstain, basesPublicasAbstain, codigoPenalAbstain] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
+          const { cf: cfValidadosAbstain, cp: cpValidadosAbstain } = await validateLegislacaoComRag(texto, cfArticlesAbstain, codigoPenalAbstain)
+          if (cfValidadosAbstain.length > 0 || basesPublicasAbstain.length > 0 || cpValidadosAbstain.length > 0) {
+            send({ type: 'metadata', data: { cf_articles: cfValidadosAbstain, bases_publicas: basesPublicasAbstain, codigo_penal: cpValidadosAbstain, gemini_quota_exceeded: geminiQuotaExceeded } as any })
+          }
           send({ type: 'error', error: buildAbstainMessage({ retrievalConfidence, evidenceCoverage }) })
           send({ type: 'complete', processoId })
           return
@@ -325,6 +631,13 @@ export async function POST(req: NextRequest) {
 
         // Send results to client
         send({ type: 'results', results: toonResults })
+
+        // ─── Step 3b: Enviar CF/88, Bases Públicas e Código Penal (validados por RAG) ───────
+        const [cfArticles, basesPublicas, codigoPenal] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
+        const { cf: cfValidados, cp: cpValidados } = await validateLegislacaoComRag(texto, cfArticles, codigoPenal)
+        if (cfValidados.length > 0 || basesPublicas.length > 0 || cpValidados.length > 0) {
+          send({ type: 'metadata', data: { cf_articles: cfValidados, bases_publicas: basesPublicas, codigo_penal: cpValidados, gemini_quota_exceeded: geminiQuotaExceeded } as any })
+        }
 
         // ─── Step 4: Per-result streaming justification ──
         const toonPayloads = toonResults.map(r => r.toonData!).filter(Boolean)
