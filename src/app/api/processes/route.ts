@@ -168,27 +168,23 @@ export async function POST(req: NextRequest) {
       try {
         const namespace = namespaceForUser(authUser.uid)
         const chunks = chunkText(String(payload.textoOriginal), 900, 180).slice(0, 6)
-        const vectors: Array<{ id: string; values: number[]; metadata: Record<string, unknown> }> = []
-        for (let i = 0; i < chunks.length; i += 1) {
-          const c = chunks[i]
-          const emb = await generateEmbedding(c)
-          vectors.push({
-            id: `${processoRef.id}::proc::${i}`,
-            values: emb,
-            metadata: {
-              fonte: 'base_interna',
-              processoId: processoRef.id,
-              numero: String(payload.numero || ''),
-              tribunal: String(payload.tribunal || ''),
-              relator: '',
-              dataJulgamento: String(payload.dataProtocolo || ''),
-              ementa: c.slice(0, 1800),
-              texto: c.slice(0, 1800),
-              userId: authUser.uid,
-              ingestedAt: nowIso,
-            },
-          })
-        }
+        const embeddings = await Promise.all(chunks.map(c => generateEmbedding(c)))
+        const vectors = chunks.map((c, i) => ({
+          id: `${processoRef.id}::proc::${i}`,
+          values: embeddings[i],
+          metadata: {
+            fonte: 'base_interna',
+            processoId: processoRef.id,
+            numero: String(payload.numero || ''),
+            tribunal: String(payload.tribunal || ''),
+            relator: '',
+            dataJulgamento: String(payload.dataProtocolo || ''),
+            ementa: c.slice(0, 1800),
+            texto: c.slice(0, 1800),
+            userId: authUser.uid,
+            ingestedAt: nowIso,
+          },
+        }))
         if (vectors.length > 0) {
           await upsertPinecone(vectors, namespace)
           console.log('[processes] pinecone upsert ok', {

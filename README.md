@@ -34,7 +34,7 @@ Uma plataforma completa para advogados que combina RAG (Retrieval-Augmented Gene
 | Auth         | Firebase Authentication            |
 | Database     | Firestore                          |
 | Storage      | Firebase Storage                   |
-| Embeddings   | Gemini text-embedding-004          |
+| Embeddings   | Gemini gemini-embedding-001          |
 | LLM          | Gemini 2.0 Flash (streaming)       |
 | Reranking    | Cohere rerank-multilingual-v3.0    |
 | Anti-Aluc.   | **TOON** (Typed Object Notation)   |
@@ -102,8 +102,8 @@ Acesse: [http://localhost:3000](http://localhost:3000)
 - **LLM**: temperatura 0.1, top_p 0.6 (respostas determinísticas)
 
 **Ingestão opcional (Pinecone)**: Se quiser busca vetorial em vez de full-text:
-1. Preencha `PINECONE_API_KEY` e `PINECONE_HOST`
-2. Crie o índice Pinecone com dimensão compatível ao embedding (`text-embedding-004`).
+1. Preencha `PINECONE_API_KEY` e `PINECONE_HOST` (ou `PINECONE_INDEX` para conexão por nome)
+2. Crie o índice com dimensão 3072 (gemini-embedding-001): `npm run pinecone:create-index`
 3. Rode a aplicação (`npm run dev`).
 4. Execute uma ingestão inicial via HTTP:
 ```bash
@@ -122,7 +122,13 @@ curl -X POST http://localhost:3000/api/admin/datajud-ingest \
 ```
 5. Após ingestão, a busca da análise usa o Pinecone com metadados `fonte=datajud_cnj`.
 
-**Ingestão CF/88 e Código Penal (Pinecone)**: Para injetar Constituição Federal e Código Penal no namespace de legislação:
+**Seed automático no primeiro run**: Ao iniciar a aplicação (`npm run dev`), a CF/88 e o Código Penal são buscados dos links oficiais do Planalto e inseridos no Pinecone (namespace `legislacao`) automaticamente. A flag `.legislacao-seeded` indica que o seed já foi executado. Para forçar o seed manualmente (ex.: em Vercel):
+```bash
+curl -X POST http://localhost:3000/api/setup/seed-legislacao
+```
+Em localhost não requer auth; em produção, configure `SETUP_SECRET` e use `Authorization: Bearer <SETUP_SECRET>`.
+
+**Ingestão manual** (reingestão via admin): Para injetar Constituição Federal e Código Penal no namespace de legislação:
 
 1. Configure `PINECONE_LEGISLACAO_NAMESPACE=legislacao` em `.env.local` (opcional; padrão: `legislacao`).
 2. Execute:

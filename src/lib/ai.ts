@@ -14,7 +14,7 @@ export const aiModels = {
     (activeProvider === 'gemini' ? 'gemini-2.0-flash' : 'gpt-4o-mini'),
   embedding:
     process.env.AI_EMBEDDING_MODEL ||
-    (activeProvider === 'gemini' ? 'text-embedding-004' : 'text-embedding-3-small'),
+    (activeProvider === 'gemini' ? 'gemini-embedding-001' : 'text-embedding-3-small'),
 }
 
 if (!geminiApiKey && !openAiApiKey) {

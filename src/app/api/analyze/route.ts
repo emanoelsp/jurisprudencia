@@ -25,6 +25,7 @@ import { getCodigoPenalResumoParaIA } from '@/lib/codigo-penal'
 import { BASES_PUBLICAS_SYSTEM, BASES_PUBLICAS_FEW_SHOT, BASES_PUBLICAS_USER_PREFIX } from '@/lib/prompts/bases-publicas'
 import { parseToonBasesPublicas } from '@/lib/toon-bases-publicas'
 import { parseToonCf } from '@/lib/toon-cf'
+import { extractCausaPetendi } from '@/lib/tools/extract-causa-petendi'
 import type { AnalysisChunk } from '@/types'
 
 function parseBasesPublicasResponse(raw: string): Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }> {
@@ -406,6 +407,27 @@ export async function POST(req: NextRequest) {
         let geminiQuotaExceeded = false
         const mark429 = () => { geminiQuotaExceeded = true }
 
+        const invokeLlmForExtract = async (system: string, user: string) => {
+          const result = await callGeminiWithRetry(
+            () => aiClient.chat.completions.create({
+              model: aiModels.chat,
+              temperature: 0.1,
+              top_p: 0.6,
+              max_tokens: 600,
+              messages: [
+                { role: 'system', content: system },
+                { role: 'user', content: user },
+              ],
+            }),
+            mark429
+          )
+          if (!result.ok) throw new Error('Gemini quota exceeded')
+          return result.data.choices?.[0]?.message?.content || ''
+        }
+
+        // ─── Step 0: Sub-agente extract_causa_petendi (query RAG otimizada) ─
+        const extractCausaPetendiPromise = extractCausaPetendi(texto, invokeLlmForExtract)
+
         // ─── Step 0a: Bases Públicas (IA) – TOON como semantic_agent, sem response_format ─
         const basesPublicasPromise = (async () => {
           try {
@@ -531,10 +553,19 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
           }
         })()
 
-        // ─── Step 1: Vector Search ───────────────────────
+        // ─── Step 1: RAG Híbrido (Vector + BM25 + RRF) ─
+        const causaPetendiResult = await extractCausaPetendiPromise
+        const queryRag = causaPetendiResult?.queryRag || texto
+        if (causaPetendiResult?.queryRag) {
+          console.log('[analyze] extract_causa_petendi OK, using queryRag for search', {
+            causaLen: causaPetendiResult.causaPetendi?.length || 0,
+            queryLen: causaPetendiResult.queryRag?.length || 0,
+          })
+        }
+
         const tSearch = Date.now()
         const rawResults = await searchEproc(
-          texto,
+          queryRag,
           8,
           shouldExpandScope
             ? { ...(clientNamespace ? { namespace: clientNamespace } : {}) }
@@ -553,7 +584,7 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
 
         // ─── Step 2: Reranking ───────────────────────────
         const tRerank = Date.now()
-        const reranked = await rerankResults(texto, rawResults)
+        const reranked = await rerankResults(queryRag, rawResults)
         const deduped = dedupeEprocResults(reranked)
         const withConfidence = deduped.filter(r => effectiveScore(r) >= minConfidenceScore)
         const topRanked = withConfidence

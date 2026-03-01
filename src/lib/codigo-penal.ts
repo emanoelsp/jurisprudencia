@@ -1,5 +1,5 @@
-// Artigos principais do Código Penal (Decreto-lei 2.848/1940)
-// Fonte: Senado Federal - https://www2.senado.leg.br/bdsf/bitstream/handle/id/608973/Codigo_penal_6ed.pdf
+// Artigos do Código Penal (Decreto-lei 2.848/1940)
+// Fonte: Planalto - https://www.planalto.gov.br/ccivil_03/decreto-lei/del2848compilado.htm
 
 export interface ArtigoPenal {
   id: string
@@ -31,9 +31,81 @@ export const ARTIGOS_PENAIS: ArtigoPenal[] = [
   { id: 'cp-312', titulo: 'Art. 312 CP - Peculato', tema: 'Crimes contra a Administração Pública', texto: 'Apropriar-se o funcionário público de dinheiro, valor ou qualquer outro bem móvel, público ou particular, de que tem a posse em razão do cargo, ou desviá-lo, em proveito próprio ou alheio: Pena – reclusão, de dois a doze anos, e multa.' },
 ]
 
-export function getCodigoPenalResumoParaIA(maxChars = 6000): string {
-  return ARTIGOS_PENAIS
+export function getCodigoPenalResumoParaIA(maxChars = 6000, arts?: ArtigoPenal[]): string {
+  const list = arts ?? ARTIGOS_PENAIS
+  return list
     .map(a => `[${a.titulo}]\n${a.texto}`)
     .join('\n\n')
     .slice(0, maxChars)
+}
+
+const CP_PLANALTO_URL = 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del2848compilado.htm'
+
+let cachedCpArticles: ArtigoPenal[] | null = null
+let cpCacheTime = 0
+const CP_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+function stripHtmlCp(html: string): string {
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\[\([^)]*\)\]/g, '') // remove links tipo [(Vide Lei...)]
+    .trim()
+}
+
+function parseCpHtml(html: string): ArtigoPenal[] {
+  const articles: ArtigoPenal[] = []
+  const text = stripHtmlCp(html)
+  const artBlocks = text.split(/(?=Art\.\s*\d+[ºª°]?)/i)
+  for (const block of artBlocks) {
+    const m = block.match(/Art\.\s*(\d+)[ºª°]?\s*[-–—]?\s*([\s\S]+?)(?=Art\.\s*\d+[ºª°]?|$)/i)
+    if (m) {
+      const num = m[1].trim()
+      let corpo = (m[2] || '').trim()
+      corpo = corpo.replace(/\s*\(\[Reda[^)]*\)\)/gi, '').replace(/\s*\(\[Inclu[^)]*\)\)/gi, '').trim()
+      if (corpo.length > 20) {
+        const id = `cp-${num}`
+        const titulo = `Art. ${num} CP`
+        articles.push({ id, titulo, texto: corpo.slice(0, 2000), tema: '' })
+      }
+    }
+  }
+  return articles.slice(0, 400)
+}
+
+/**
+ * Busca o Código Penal completo no site do Planalto.
+ * Fallback para ARTIGOS_PENAIS estático em caso de falha de rede.
+ */
+export async function fetchCodigoPenalPlanalto(): Promise<ArtigoPenal[]> {
+  if (cachedCpArticles && Date.now() - cpCacheTime < CP_CACHE_TTL_MS) {
+    return cachedCpArticles
+  }
+  try {
+    const res = await fetch(CP_PLANALTO_URL, {
+      headers: { Accept: 'text/html; charset=iso-8859-1' },
+      next: { revalidate: 86400 },
+    })
+    const buf = await res.arrayBuffer()
+    const decoder = new TextDecoder('iso-8859-1')
+    const html = decoder.decode(buf)
+    const parsed = parseCpHtml(html)
+    if (parsed.length > 10) {
+      cachedCpArticles = parsed
+      cpCacheTime = Date.now()
+      return cachedCpArticles
+    }
+  } catch (err) {
+    console.warn('[codigo-penal] fetch planalto failed', err)
+  }
+  cachedCpArticles = ARTIGOS_PENAIS
+  cpCacheTime = Date.now()
+  return ARTIGOS_PENAIS
 }

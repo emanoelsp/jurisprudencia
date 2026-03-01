@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test:regression": "node --test tests/regression-guards.test.js",
+    "pinecone:create-index": "node scripts/create-pinecone-index.mjs",
     "test:gold": "node scripts/evaluate-gold.mjs",
     "release:check": "npm run test:regression && npm run test:gold && npm run build"
   },

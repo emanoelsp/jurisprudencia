@@ -199,100 +199,213 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   return embedding
 }
 
-// ─── 5. Busca jurisprudência (DataJud API + Pinecone opcional) ─────────────────
-// Sem mock: usa apenas DataJud (API Pública CNJ) e/ou Pinecone (se configurado).
+// ─── 5. Busca jurisprudência (RAG Híbrido: DataJud + Pinecone + RRF) ─────────────
 
-export async function searchEproc(
+const RRF_K = 60 // Reciprocal Rank Fusion constant
+
+/**
+ * Fusão Recíproca de Rank (RRF) – combina listas ranqueadas sem precisar de scores absolutos.
+ * score(d) = Σ 1/(k + rank(d)) para cada lista onde d aparece.
+ * Crucial para fusão keyword (DataJud) + vetorial (Pinecone).
+ */
+function fuseWithRRF(
+  listA: EprocResult[],
+  listB: EprocResult[],
+  k = RRF_K
+): EprocResult[] {
+  const byKey = (r: EprocResult) => `${r.numero.trim()}::${normalizeEmenta(r.ementa).slice(0, 100)}`
+  const scores = new Map<string, { score: number; result: EprocResult }>()
+
+  for (const [list, source] of [
+    [listA, 'A'] as const,
+    [listB, 'B'] as const,
+  ]) {
+    list.forEach((r, rank) => {
+      const key = byKey(r)
+      const rrf = 1 / (k + rank + 1)
+      const existing = scores.get(key)
+      if (existing) {
+        existing.score += rrf
+      } else {
+        scores.set(key, {
+          score: rrf,
+          result: { ...r, score: rrf },
+        })
+      }
+    })
+  }
+
+  const fused = Array.from(scores.values())
+    .sort((a, b) => b.score - a.score)
+    .map(({ result }) => {
+      const maxRrf = 2 / (k + 1) // normalizado para 0..1
+      const norm = Math.min(1, result.score / maxRrf)
+      return { ...result, score: norm, badge: scoreToBadge(norm) }
+    })
+
+  return fused
+}
+
+/** Busca DataJud (keyword/sparse) – retorna EprocResult[] ou [] */
+async function fetchDataJudResults(
+  queryText: string,
+  tribunal: string,
+  topK: number
+): Promise<EprocResult[]> {
+  const apiKey = process.env.DATAJUD_API_KEY
+  if (!apiKey || !tribunal || tribunal === 'TODOS') return []
+
+  try {
+    const docs = await fetchDataJudByQuery({
+      queryText,
+      tribunalSigla: tribunal,
+      apiKey,
+      size: topK,
+    })
+    return docs.map((d, i) => ({
+      id: d.id,
+      numero: d.numero,
+      ementa: d.ementa,
+      tribunal: d.tribunal,
+      relator: d.relator,
+      dataJulgamento: d.dataJulgamento,
+      score: 0.85 - i * 0.04,
+      badge: scoreToBadge(0.85 - i * 0.04) as 'alta' | 'media' | 'baixa',
+      fonte: 'datajud_cnj' as const,
+    }))
+  } catch (err) {
+    console.warn('[rag] datajud query failed', err)
+    return []
+  }
+}
+
+/** Busca Pinecone (vetorial) – retorna EprocResult[] ou [] */
+async function fetchPineconeResults(
+  queryText: string,
+  topK: number,
+  tribunal: string,
+  namespace: string
+): Promise<EprocResult[]> {
+  if (!process.env.PINECONE_HOST || !process.env.PINECONE_API_KEY) return []
+
+  try {
+    const vector = await generateEmbedding(queryText)
+    const juriFilter = tribunal && tribunal !== 'TODOS' ? { tribunal: { $eq: tribunal } } : undefined
+    const globalNamespace = process.env.PINECONE_NAMESPACE?.trim() || ''
+    const legislacaoNamespace = process.env.PINECONE_LEGISLACAO_NAMESPACE?.trim() || 'legislacao'
+    const allMatches: Array<{ m: any }> = []
+
+    for (const ns of [namespace || '', globalNamespace].filter(Boolean)) {
+      const data = await queryPinecone(vector, topK, juriFilter, ns || undefined)
+      const matches = Array.isArray(data?.matches) ? data.matches : []
+      matches.forEach((m: any) => allMatches.push({ m }))
+    }
+    const legisData = await queryPinecone(vector, Math.min(topK, 4), undefined, legislacaoNamespace)
+    const legisMatches = Array.isArray(legisData?.matches) ? legisData.matches : []
+    legisMatches.forEach((m: any) => allMatches.push({ m }))
+
+    if (allMatches.length === 0) return []
+
+    const seen = new Set<string>()
+    return allMatches
+      .sort((a, b) => (Number(b.m.score) || 0) - (Number(a.m.score) || 0))
+      .slice(0, topK * 2) // buffer para dedupe
+      .filter(({ m }) => {
+        const id = String(m.id || '')
+        if (seen.has(id)) return false
+        seen.add(id)
+        return true
+      })
+      .map(({ m }, i): EprocResult => {
+        const fonteRaw = m.metadata?.fonte as string | undefined
+        const fonte: 'datajud_cnj' | 'base_interna' | 'mock' =
+          fonteRaw === 'datajud_cnj' || fonteRaw === 'mock' ? fonteRaw : 'base_interna'
+        return {
+          id: String(m.id || `pc-${i}`),
+          numero: String(m.metadata?.numero || m.metadata?.processo || m.metadata?.titulo || ''),
+          ementa: String(m.metadata?.ementa || m.metadata?.texto || ''),
+          tribunal: String(m.metadata?.tribunal || ''),
+          relator: String(m.metadata?.relator || ''),
+          dataJulgamento: String(m.metadata?.dataJulgamento || ''),
+          score: Number(m.score || 0),
+          badge: scoreToBadge(Number(m.score || 0)),
+          fonte,
+        }
+      })
+      .slice(0, topK)
+  } catch (err) {
+    console.warn('[rag] pinecone query failed', err)
+    return []
+  }
+}
+
+/**
+ * RAG Híbrido: executa DataJud (keyword) e Pinecone (vetorial) em paralelo,
+ * funde com RRF e deduplica. Quando ambos retornam, prioriza acórdãos
+ * relevantes em ambos os rankings (termos exatos + semântica).
+ */
+export async function searchHybrid(
   queryText: string,
   topK = 8,
   options?: { tribunal?: string; namespace?: string }
 ): Promise<EprocResult[]> {
   const tribunal = options?.tribunal?.trim().toUpperCase() || ''
   const namespace = options?.namespace?.trim() || ''
+  const cacheKey = `hybrid::${normalizeForCache(queryText)}::${topK}::${tribunal || 'ALL'}::${namespace || 'default'}`
+  const cached = getCache(searchCache, cacheKey)
+  if (cached) return cached.map(r => ({ ...r }))
+
+  const hasDataJud = Boolean(process.env.DATAJUD_API_KEY && tribunal && tribunal !== 'TODOS')
+  const hasPinecone = Boolean(process.env.PINECONE_HOST && process.env.PINECONE_API_KEY)
+
+  let results: EprocResult[] = []
+
+  if (hasDataJud && hasPinecone) {
+    // Híbrido: DataJud + Pinecone em paralelo → RRF
+    const [dataJudRes, pineconeRes] = await Promise.all([
+      fetchDataJudResults(queryText, tribunal, topK + 4),
+      fetchPineconeResults(queryText, topK + 4, tribunal, namespace),
+    ])
+    if (dataJudRes.length > 0 && pineconeRes.length > 0) {
+      results = fuseWithRRF(dataJudRes, pineconeRes).slice(0, topK)
+    } else if (dataJudRes.length > 0) {
+      results = dataJudRes.slice(0, topK)
+    } else if (pineconeRes.length > 0) {
+      results = pineconeRes.slice(0, topK)
+    }
+  } else if (hasDataJud) {
+    results = await fetchDataJudResults(queryText, tribunal, topK)
+  } else if (hasPinecone) {
+    results = await fetchPineconeResults(queryText, topK, tribunal, namespace)
+  }
+
+  if (results.length > 0) {
+    setCache(searchCache, cacheKey, results, SEARCH_CACHE_TTL_MS)
+  }
+  return results.map(r => ({ ...r }))
+}
+
+/** Busca jurisprudência – usa RAG híbrido por padrão (DataJud + Pinecone + RRF). */
+export async function searchEproc(
+  queryText: string,
+  topK = 8,
+  options?: { tribunal?: string; namespace?: string; hybrid?: boolean }
+): Promise<EprocResult[]> {
+  const hybrid = options?.hybrid !== false
+  if (hybrid) {
+    return searchHybrid(queryText, topK, options)
+  }
+
+  // Fallback: comportamento legado (DataJud primeiro, Pinecone se vazio)
+  const tribunal = options?.tribunal?.trim().toUpperCase() || ''
+  const namespace = options?.namespace?.trim() || ''
   const cacheKey = `${normalizeForCache(queryText)}::${topK}::${tribunal || 'ALL'}::${namespace || 'default'}`
   const cached = getCache(searchCache, cacheKey)
   if (cached) return cached.map(r => ({ ...r }))
 
-  let results: EprocResult[] = []
-
-  // 1. DataJud API (fonte principal quando tribunal definido)
-  const apiKey = process.env.DATAJUD_API_KEY
-  if (apiKey && tribunal && tribunal !== 'TODOS') {
-    try {
-      const datajudDocs = await fetchDataJudByQuery({
-        queryText,
-        tribunalSigla: tribunal,
-        apiKey,
-        size: topK,
-      })
-      if (datajudDocs.length > 0) {
-        results = datajudDocs.map((d, i) => ({
-          id: d.id,
-          numero: d.numero,
-          ementa: d.ementa,
-          tribunal: d.tribunal,
-          relator: d.relator,
-          dataJulgamento: d.dataJulgamento,
-          score: 0.85 - i * 0.04,
-          badge: scoreToBadge(0.85 - i * 0.04),
-          fonte: 'datajud_cnj',
-        }))
-      }
-    } catch (err) {
-      console.warn('[rag] datajud query failed', err)
-    }
-  }
-
-  // 2. Pinecone (vetorial, se configurado e DataJud vazio)
-  if (results.length === 0 && process.env.PINECONE_HOST && process.env.PINECONE_API_KEY) {
-    try {
-      const vector = await generateEmbedding(queryText)
-      const juriFilter = tribunal && tribunal !== 'TODOS' ? { tribunal: { $eq: tribunal } } : undefined
-      const globalNamespace = process.env.PINECONE_NAMESPACE?.trim() || ''
-      const legislacaoNamespace = process.env.PINECONE_LEGISLACAO_NAMESPACE?.trim() || 'legislacao'
-      const allMatches: Array<{ m: any; ns: string }> = []
-
-      for (const ns of [namespace || '', globalNamespace].filter(Boolean)) {
-        const data = await queryPinecone(vector, topK, juriFilter, ns || undefined)
-        const matches = Array.isArray(data?.matches) ? data.matches : []
-        for (const m of matches) allMatches.push({ m, ns })
-      }
-      const legisData = await queryPinecone(vector, Math.min(topK, 4), undefined, legislacaoNamespace)
-      const legisMatches = Array.isArray(legisData?.matches) ? legisData.matches : []
-      for (const m of legisMatches) allMatches.push({ m, ns: legislacaoNamespace })
-
-      if (allMatches.length > 0) {
-        const seen = new Set<string>()
-        const mapped = allMatches
-          .sort((a, b) => (Number(b.m.score) || 0) - (Number(a.m.score) || 0))
-          .slice(0, topK)
-          .filter(({ m }) => {
-            const id = String(m.id || '')
-            if (seen.has(id)) return false
-            seen.add(id)
-            return true
-          })
-          .map(({ m }, i): EprocResult => {
-            const fonteRaw = m.metadata?.fonte as string | undefined
-            const fonte: 'datajud_cnj' | 'base_interna' | 'mock' =
-              fonteRaw === 'datajud_cnj' || fonteRaw === 'mock' ? fonteRaw : 'base_interna'
-            return {
-              id: String(m.id || `pc-${i}`),
-              numero: String(m.metadata?.numero || m.metadata?.processo || m.metadata?.titulo || ''),
-              ementa: String(m.metadata?.ementa || m.metadata?.texto || ''),
-              tribunal: String(m.metadata?.tribunal || ''),
-              relator: String(m.metadata?.relator || ''),
-              dataJulgamento: String(m.metadata?.dataJulgamento || ''),
-              score: Number(m.score || 0),
-              badge: scoreToBadge(Number(m.score || 0)),
-              fonte,
-            }
-          })
-        results = mapped
-      }
-    } catch (err) {
-      console.warn('[rag] pinecone query failed', err)
-    }
+  let results = await fetchDataJudResults(queryText, tribunal, topK)
+  if (results.length === 0) {
+    results = await fetchPineconeResults(queryText, topK, tribunal, namespace)
   }
 
   if (results.length > 0) {
@@ -400,18 +513,37 @@ async function rerankWithCohere(query: string, results: EprocResult[]): Promise<
   }
 }
 
+/** Stopwords comuns */
+const STOPWORDS = new Set([
+  'de', 'da', 'do', 'das', 'dos', 'a', 'o', 'e', 'em', 'com', 'para', 'por',
+  'uma', 'um', 'ao', 'na', 'no', 'que', 'se', 'processo',
+])
+
+/** Tribunais e siglas – cruciais para BM25 lexical em jurisprudência */
+const TRIBUNAL_SIGLAS = /\b(STJ|STF|TST|TSE|STM|TRF[1-6]|TJ[A-Z]{2})\b/gi
+
 function extractRelevantTerms(text: string): string[] {
-  const stop = new Set([
-    'de', 'da', 'do', 'das', 'dos', 'a', 'o', 'e', 'em', 'com', 'para', 'por',
-    'uma', 'um', 'ao', 'na', 'no', 'que', 'se', 'art', 'artigo', 'processo',
-  ])
-  const terms = text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+  const lower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const terms = new Set<string>()
+
+  // 1. Números de artigo (Art. 138, Art. 5º, § 1º) – BM25 precisa de termos exatos
+  const artNums = Array.from(lower.matchAll(/\bart\.?\s*(\d+)|§\s*(\d+)|inciso\s*(\d+)|(\d{1,4})\s*(?:º|ª)?/gi))
+  for (const m of artNums) {
+    const n = (m[1] || m[2] || m[3] || m[4] || '').trim()
+    if (n && n.length <= 4) terms.add(n)
+  }
+
+  // 2. Siglas de tribunais – TJSC, STJ, etc.
+  const siglas = lower.match(TRIBUNAL_SIGLAS) || []
+  siglas.forEach(s => terms.add(s.toUpperCase()))
+
+  // 3. Termos lexicais (≥4 chars, sem stopwords)
+  const lexical = lower
     .split(/\W+/)
-    .filter(t => t.length >= 4 && !stop.has(t))
-  return Array.from(new Set(terms)).slice(0, 30)
+    .filter(t => t.length >= 4 && !STOPWORDS.has(t) && !/^\d+$/.test(t))
+  lexical.forEach(t => terms.add(t))
+
+  return Array.from(terms).slice(0, 35)
 }
 
 export function scoreToBadge(score: number): 'alta' | 'media' | 'baixa' {
