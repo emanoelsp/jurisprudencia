@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
 const nav = [
-  { href: '/dashboard',                     icon: LayoutDashboard, label: 'Visao Geral' },
+  { href: '/dashboard',                     icon: LayoutDashboard, label: 'Visão Geral' },
   { href: '/dashboard/processos',           icon: FileText,        label: 'Processos' },
   { href: '/dashboard/base-conhecimento',   icon: BookOpen,        label: 'Base de Conhecimento' },
   { href: '/dashboard/planos',              icon: WalletCards,     label: 'Planos' },
@@ -38,7 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   async function handleSignOut() {
     await signOut()
-    toast.success('Ate logo!')
+    toast.success('Até logo!')
     router.replace('/')
   }
 

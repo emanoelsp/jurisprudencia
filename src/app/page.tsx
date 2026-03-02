@@ -48,7 +48,7 @@ export default function HomePage() {
       }
       router.push('/dashboard')
     } catch (err: any) {
-      toast.error(err.message || 'Erro na autenticacao.')
+              toast.error(err.message || 'Erro na autenticação.')
     } finally {
       setSubmitting(false)
     }
@@ -103,7 +103,7 @@ export default function HomePage() {
             <div className="flex items-center gap-3">
               <div className="w-8 h-[1px] bg-brand-gold/60" />
               <p className="text-brand-gold/80 font-body text-[11px] uppercase tracking-[0.25em] font-semibold">
-                Inteligencia Juridica Aplicada
+                Inteligência Jurídica Aplicada
               </p>
             </div>
           </div>
@@ -118,18 +118,18 @@ export default function HomePage() {
                 <span className="text-brand-gold italic">Direito.</span>
               </h1>
               <p className="font-body text-brand-slate text-base xl:text-lg leading-relaxed max-w-md">
-                Analise jurisprudencial com inteligencia artificial para fundamentar
-                teses, mapear tendencias e antecipar decisoes com precisao.
+                Analise jurisprudencial com inteligência artificial para fundamentar
+                teses, mapear tendências e antecipar decisões com precisão.
               </p>
             </div>
 
             {/* Feature Pillars */}
             <div className="grid grid-cols-2 gap-4">
               {[
-                { icon: Scale, label: 'Pesquisa Inteligente', desc: 'Padroes e probabilidades extraidos de milhares de decisoes' },
-                { icon: Shield, label: 'Seguranca Juridica', desc: 'Fundamentacao embasada em dados reais dos tribunais' },
-                { icon: BookOpen, label: 'Base de Conhecimento', desc: 'Acervo curado de jurisprudencia organizado por materia' },
-                { icon: BarChart3, label: 'Analise Estrategica', desc: 'Mapeamento por tribunal, camara e julgador' },
+                { icon: Scale, label: 'Pesquisa Inteligente', desc: 'Padrões e probabilidades extraídos de milhares de decisões' },
+                { icon: Shield, label: 'Segurança Jurídica', desc: 'Fundamentação embasada em dados reais dos tribunais' },
+                { icon: BookOpen, label: 'Base de Conhecimento', desc: 'Acervo curado de jurisprudência organizado por matéria' },
+                { icon: BarChart3, label: 'Análise Estratégica', desc: 'Mapeamento por tribunal, câmara e julgador' },
               ].map(({ icon: Icon, label, desc }, i) => (
                 <div
                   key={label}
@@ -150,8 +150,8 @@ export default function HomePage() {
               className={`flex items-center gap-8 xl:gap-12 pt-2 transition-all duration-700 delay-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
             >
               {[
-                { val: '50K', suf: '+', label: 'Decisoes analisadas' },
-                { val: '97', suf: '%', label: 'Precisao na pesquisa' },
+                { val: '50K', suf: '+', label: 'Decisões analisadas' },
+                { val: '97', suf: '%', label: 'Precisão na pesquisa' },
                 { val: '12', suf: '', label: 'Tribunais cobertos' },
               ].map(({ val, suf, label }) => (
                 <div key={label} className="space-y-1">
@@ -199,7 +199,7 @@ export default function HomePage() {
               <div className="flex items-center justify-center gap-3">
                 <div className="w-6 h-[1px] bg-brand-gold/50" />
                 <p className="text-brand-gold/70 font-body text-[10px] uppercase tracking-[0.25em] font-semibold">
-                  Inteligencia Juridica
+                Inteligência Jurídica
                 </p>
                 <div className="w-6 h-[1px] bg-brand-gold/50" />
               </div>
@@ -210,8 +210,7 @@ export default function HomePage() {
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-5 h-[1px] bg-brand-gold/60" />
                 <p className="text-brand-gold text-[10px] uppercase tracking-[0.22em] font-bold font-body">
-                  Acesso profissional
-                </p>
+                  Acesso profissional                </p>
               </div>
               <h2 className="font-display text-2xl font-bold text-brand-cream leading-tight">
                 {mode === 'login' ? 'Entrar na plataforma' : 'Criar sua conta'}
@@ -219,7 +218,7 @@ export default function HomePage() {
               <p className="font-body text-brand-slate text-sm leading-relaxed">
                 {mode === 'login'
                   ? 'Acesse seu ambiente institucional para continuar.'
-                  : 'Inicie sua avaliacao e conheca a inteligencia juridica da IURISPRUDENTIA.'}
+                  : 'Inicie sua avaliação e conheça a inteligência jurídica da IURISPRUDENTIA.'}
               </p>
             </div>
 
@@ -228,7 +227,7 @@ export default function HomePage() {
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-brand-indigo/8 border border-brand-indigo/20">
                 <div className="w-1.5 h-1.5 rounded-full bg-brand-indigo animate-pulse flex-shrink-0" />
                 <p className="font-body text-brand-indigo text-xs font-semibold">
-                  Avaliacao gratuita: 7 dias e 2 analises por dia
+                  Avaliação gratuita: 7 dias e 2 análises por dia
                 </p>
               </div>
             )}
@@ -261,7 +260,7 @@ export default function HomePage() {
                     <option value="free">Trial (7 dias, 2 documentos/dia)</option>
                     <option value="plano1">Starter (R$ 89,90)</option>
                     <option value="plano2">Pro (R$ 179,90)</option>
-                    <option value="escritorio">Escritorio (R$ 459,90)</option>
+                    <option value="escritorio">Escritório (R$ 459,90)</option>
                     <option value="start">Enterprise (sob consulta)</option>
                   </select>
                 </div>
@@ -360,7 +359,7 @@ export default function HomePage() {
 
             {/* Toggle mode */}
             <p className="text-center font-body text-brand-slate text-sm">
-              {mode === 'login' ? 'Nao tem conta?' : 'Ja tem conta?'}{' '}
+            {mode === 'login' ? 'Não tem conta?' : 'Já tem conta?'}{' '}
               <button
                 onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
                 className="text-brand-gold hover:text-brand-goldlt font-semibold transition-colors"
@@ -374,8 +373,8 @@ export default function HomePage() {
             <div className="lg:hidden space-y-4 pt-4">
               <div className="flex items-center justify-center gap-6 text-brand-slate/50">
                 {[
-                  { val: '50K+', label: 'Decisoes' },
-                  { val: '97%', label: 'Precisao' },
+                  { val: '50K+', label: 'Decisões' },
+                  { val: '97%', label: 'Precisão' },
                   { val: '12', label: 'Tribunais' },
                 ].map(({ val, label }) => (
                   <div key={label} className="text-center">

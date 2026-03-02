@@ -58,7 +58,7 @@ export default function DashboardPage() {
             {greeting}, {userData?.displayName?.split(' ')[0] || 'Dr.'}
           </h1>
           <p className="font-body text-brand-slate text-sm mt-1">
-            Sua plataforma de inteligencia juridica esta pronta.
+            Sua plataforma de inteligência jurídica está pronta.
           </p>
         </div>
         <Link href="/dashboard/processos" className="btn-primary self-start sm:self-auto">
@@ -102,7 +102,7 @@ export default function DashboardPage() {
           <div className="p-8 sm:p-12 text-center space-y-3">
             <FileText size={36} className="text-brand-border mx-auto" />
             <p className="font-body text-brand-slate text-sm">
-              Nenhum processo ainda. Que tal comecar?
+            Nenhum processo ainda. Que tal começar?
             </p>
             <Link href="/dashboard/processos" className="btn-primary inline-flex">
               <Plus size={14} />
@@ -125,7 +125,7 @@ export default function DashboardPage() {
                     {p.cliente || '--'}
                   </p>
                   <p className="font-mono text-brand-slate text-[11px] sm:text-xs mt-0.5 truncate">
-                    {p.numero || 'Numero pendente'}
+                    {p.numero || 'Número pendente'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">

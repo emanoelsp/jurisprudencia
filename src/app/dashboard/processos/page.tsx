@@ -48,7 +48,7 @@ export default function ProcessosPage() {
     return Promise.race([
       promise,
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`${label} timeout apos ${ms}ms`)), ms)
+        setTimeout(() => reject(new Error(`${label} timeout após ${ms}ms`)), ms)
       ),
     ])
   }
@@ -93,7 +93,7 @@ export default function ProcessosPage() {
       if (data.metadata) {
         setForm(f => ({ ...f, ...data.metadata }))
         setPdfText(data.text || '')
-        toast.success('Metadados extraidos com sucesso!')
+        toast.success('Metadados extraídos com sucesso!')
       }
     } catch {
       toast.error('Erro ao extrair metadados.')
@@ -110,7 +110,7 @@ export default function ProcessosPage() {
 
   async function handleSave() {
     if (!user || !form.numero || !form.cliente) {
-      toast.error('Numero do processo e cliente sao obrigatorios.')
+      toast.error('Número do processo e cliente são obrigatórios.')
       return
     }
 
@@ -144,10 +144,10 @@ export default function ProcessosPage() {
         } catch (uploadErr) {
           const message = (uploadErr as any)?.code || (uploadErr as any)?.message || 'erro desconhecido'
           console.warn('[save-processo] upload failed, salvando sem anexo', message)
-          toast.success('Processo salvo sem PDF (Storage indisponivel). O texto extraido foi armazenado.')
+          toast.success('Processo salvo sem PDF (Storage indisponível). O texto extraído foi armazenado.')
         }
       } else if (pdfFile && skipStorage) {
-        toast.success('Processo salvo. PDF nao armazenado (modo sem Storage).')
+        toast.success('Processo salvo. PDF não armazenado (modo sem Storage).')
       }
 
       const processo: Omit<Processo, 'id'> = {
@@ -200,7 +200,7 @@ export default function ProcessosPage() {
 
   async function handleDownloadProcess(processo: Processo) {
     if (processo.status !== 'approved') {
-      toast.error('Download disponivel apenas para processos aprovados.')
+      toast.error('Download disponível apenas para processos aprovados.')
       return
     }
 
