@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import Logo from '@/components/ui/Logo'
-import { Eye, EyeOff, ArrowRight, Scale, ShieldCheck, Building2, BrainCircuit, Target } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, Scale, BrainCircuit, Target, Building2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { PlanId } from '@/lib/plans'
 
@@ -37,7 +37,7 @@ export default function HomePage() {
       }
       router.push('/dashboard')
     } catch (err: any) {
-      toast.error(err.message || 'Erro na autenticação.')
+      toast.error(err.message || 'Erro na autenticacao.')
     } finally {
       setSubmitting(false)
     }
@@ -59,10 +59,10 @@ export default function HomePage() {
   )
 
   return (
-    <div className="min-h-screen bg-brand-navy bg-grid legal-hero-bg flex">
+    <div className="min-h-screen bg-brand-navy bg-grid legal-hero-bg flex flex-col lg:flex-row">
 
-      {/* ── Left Panel: Hero ─────────────────────────────── */}
-      <div className="hidden lg:flex flex-1 flex-col justify-between p-12 relative overflow-hidden">
+      {/* -- Left Panel: Hero (hidden on mobile, shown on lg) -- */}
+      <div className="hidden lg:flex flex-1 flex-col justify-between p-10 xl:p-14 relative overflow-hidden">
         {/* Background glows */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-brand-indigo/10 rounded-full blur-3xl" />
@@ -70,116 +70,75 @@ export default function HomePage() {
         </div>
 
         {/* Top Left Identity */}
-        <div className="relative z-10 space-y-3">
+        <div className="relative z-10 space-y-2">
           <Logo size="lg" href="/" />
-          <p className="text-brand-gold font-body text-sm uppercase tracking-widest font-semibold">
-            Inteligência Jurídica
+          <p className="text-brand-gold font-body text-xs uppercase tracking-[0.2em] font-semibold">
+            Inteligencia Juridica
           </p>
         </div>
 
         {/* Hero copy */}
-        <div className="relative z-10 w-full max-w-2xl mx-auto py-8 space-y-8 animate-slide-up">
+        <div className="relative z-10 w-full max-w-xl mx-auto py-6 space-y-8 animate-slide-up">
           <div className="space-y-4">
-            <h1 className="font-display text-5xl font-bold text-brand-cream leading-tight">
-              Inteligência Jurídica para<br />
-              <span className="text-brand-gold">decisões mais seguras.</span>
+            <h1 className="font-display text-4xl xl:text-5xl font-bold text-brand-cream leading-tight text-balance">
+              Inteligencia Juridica para{' '}
+              <span className="text-brand-gold">decisoes mais seguras.</span>
             </h1>
-            <p className="font-body text-brand-slate text-lg leading-relaxed">
-              A IURISPRUDENTIA aplica inteligência artificial à análise de jurisprudência
-              para transformar dados jurídicos em estratégia concreta.
-            </p>
-            <p className="font-body text-brand-slate text-base leading-relaxed">
-              Dados. Direito. Decisão.
+            <p className="font-body text-brand-slate text-base leading-relaxed max-w-lg">
+              A IURISPRUDENTIA aplica inteligencia artificial a analise de jurisprudencia
+              para transformar dados juridicos em estrategia concreta.
             </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {[
-              { icon: Scale, label: 'A nova geração da pesquisa jurídica', desc: 'A pesquisa tradicional encontra decisões. A IURISPRUDENTIA encontra padrões, probabilidades e fundamentos estratégicos.' },
-              { icon: BrainCircuit, label: 'Sofisticação intelectual', desc: 'Mapeamento de entendimento por tribunal, câmara e julgador, com análise semântica e estruturação de fundamentos recorrentes.' },
-              { icon: Target, label: 'Posicionamento estratégico', desc: 'Apoio estratégico para construção de teses com foco em precisão, redução de risco e ganho de eficiência.' },
-              { icon: Building2, label: 'Peso institucional', desc: 'Desenvolvida para escritórios, grupos de advogados e operações B2B com exigência técnica e confiabilidade.' },
+              { icon: Scale, label: 'Pesquisa juridica inteligente', desc: 'Encontra padroes, probabilidades e fundamentos estrategicos.' },
+              { icon: BrainCircuit, label: 'Sofisticacao intelectual', desc: 'Mapeamento por tribunal, camara e julgador.' },
+              { icon: Target, label: 'Posicionamento estrategico', desc: 'Apoio para construcao de teses com precisao.' },
+              { icon: Building2, label: 'Peso institucional', desc: 'Desenvolvida para escritorios e operacoes B2B.' },
             ].map(({ icon: Icon, label, desc }) => (
-              <div key={label} className="flex items-start gap-3 animate-slide-right">
+              <div key={label} className="flex items-start gap-3">
                 <div className="w-9 h-9 rounded-lg bg-brand-indigo/15 border border-brand-indigo/25 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <Icon size={16} className="text-brand-indigo" />
                 </div>
                 <div>
                   <p className="font-body font-semibold text-brand-cream text-sm">{label}</p>
-                  <p className="font-body text-brand-slate text-sm">{desc}</p>
+                  <p className="font-body text-brand-slate text-sm leading-relaxed">{desc}</p>
                 </div>
               </div>
             ))}
-          </div>
-
-          <div className="legal-signal-panel">
-            <p className="legal-signal-title">Inteligência aplicada ao contencioso</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="legal-signal-card">
-                <p className="legal-signal-label">Fundamento institucional</p>
-                <p className="legal-signal-value">Rigor técnico</p>
-                <p className="legal-signal-text">Processamento avançado de linguagem jurídica, modelos semânticos e segurança da informação.</p>
-              </div>
-              <div className="legal-signal-card">
-                <p className="legal-signal-label">Resultado prático</p>
-                <p className="legal-signal-value">Estratégia</p>
-                <p className="legal-signal-text">Jurisprudência convertida em insight estratégico, vantagem competitiva e decisão fundamentada.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="pricing-impact-panel">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="pricing-kicker">Posicionamento Institucional</p>
-                <h3 className="pricing-title">Solução para escritórios e jurídico corporativo</h3>
-              </div>
-              <p className="pricing-note">Solicitar demonstração · Falar com especialista</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              {[
-                { name: 'Precedentes relevantes', price: 'Precisão', limits: 'Identificação de julgados com maior aderência ao caso concreto' },
-                { name: 'Padrões decisórios', price: 'Leitura estratégica', limits: 'Mapeamento por tribunal, câmara e julgador' },
-                { name: 'Contencioso estratégico', price: 'Eficiência', limits: 'Organização inteligente de fundamentos recorrentes' },
-                { name: 'Governança jurídica', price: 'Confiabilidade', limits: 'Segurança, confidencialidade e rigor técnico institucional' },
-              ].map(plan => (
-                <div key={plan.name} className="pricing-card">
-                  <p className="pricing-card-name">{plan.name}</p>
-                  <p className="pricing-card-price">{plan.price}</p>
-                  <p className="pricing-card-limits">{plan.limits}</p>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
 
         {/* Footer */}
         <p className="font-body text-brand-slate text-xs relative z-10">
-          © {new Date().getFullYear()} IURISPRUDENTIA. Todos os direitos reservados.
+          &copy; {new Date().getFullYear()} IURISPRUDENTIA. Todos os direitos reservados.
         </p>
       </div>
 
-      {/* ── Right Panel: Auth Form ────────────────────────── */}
-      <div className="w-full lg:w-[500px] flex items-center justify-center p-8 bg-brand-navylt/95 border-l border-brand-border backdrop-blur-sm">
-        <div className="w-full max-w-sm space-y-8 animate-fade-in">
+      {/* -- Right Panel: Auth Form -- */}
+      <div className="w-full lg:w-[480px] xl:w-[500px] flex flex-col items-center justify-center px-5 py-8 sm:px-8 lg:py-0 bg-brand-navylt/95 lg:border-l border-brand-border backdrop-blur-sm min-h-screen lg:min-h-0">
+        <div className="w-full max-w-sm space-y-6 animate-fade-in">
 
-          {/* Mobile logo */}
-          <div className="lg:hidden">
+          {/* Mobile logo + tagline */}
+          <div className="lg:hidden text-center space-y-2">
             <Logo size="md" href="/" />
+            <p className="text-brand-gold font-body text-[11px] uppercase tracking-[0.2em] font-semibold">
+              Inteligencia Juridica
+            </p>
           </div>
 
           <div>
-            <p className="text-brand-gold text-xs uppercase tracking-[0.2em] font-semibold mb-3">
+            <p className="text-brand-gold text-xs uppercase tracking-[0.2em] font-semibold mb-2">
               Acesso profissional
             </p>
             <h2 className="font-display text-2xl font-bold text-brand-cream">
               {mode === 'login' ? 'Entrar na plataforma' : 'Criar sua conta'}
             </h2>
-            <p className="font-body text-brand-slate text-sm mt-1">
+            <p className="font-body text-brand-slate text-sm mt-1 leading-relaxed">
               {mode === 'login'
                 ? 'Acesse seu ambiente institucional para continuar.'
-                : 'Inicie sua avaliação e conheça a inteligência jurídica da IURISPRUDENTIA.'}
+                : 'Inicie sua avaliacao e conheca a inteligencia juridica da IURISPRUDENTIA.'}
             </p>
             <p className="font-body text-brand-indigo text-xs font-semibold mt-2">
               Free: 7 dias e 2 documentos por dia
@@ -194,7 +153,7 @@ export default function HomePage() {
                   type="text"
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  placeholder="Dr. João Silva"
+                  placeholder="Dr. Joao Silva"
                   className="input"
                   required
                 />
@@ -213,7 +172,7 @@ export default function HomePage() {
                   <option value="free">Trial (7 dias, 2 documentos/dia)</option>
                   <option value="plano1">Starter (R$ 89,90)</option>
                   <option value="plano2">Pro (R$ 179,90)</option>
-                  <option value="escritorio">Escritório (R$ 459,90)</option>
+                  <option value="escritorio">Escritorio (R$ 459,90)</option>
                   <option value="start">Enterprise (sob consulta)</option>
                 </select>
               </div>
@@ -246,6 +205,7 @@ export default function HomePage() {
                   type="button"
                   onClick={() => setShowPass(!showPass)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-slate hover:text-brand-cream transition-colors"
+                  aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -277,7 +237,7 @@ export default function HomePage() {
 
           <button
             onClick={handleGoogle}
-            className="btn-ghost w-full justify-center border-brand-border py-3 font-semibold"
+            className="btn-ghost w-full justify-center border-brand-border py-3 font-semibold border"
           >
             <svg width="16" height="16" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -289,13 +249,18 @@ export default function HomePage() {
           </button>
 
           <p className="text-center font-body text-brand-slate text-sm">
-            {mode === 'login' ? 'Não tem conta?' : 'Já tem conta?'}{' '}
+            {mode === 'login' ? 'Nao tem conta?' : 'Ja tem conta?'}{' '}
             <button
               onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
               className="text-brand-indigo hover:text-brand-indigolt font-semibold transition-colors"
             >
               {mode === 'login' ? 'Criar conta' : 'Fazer login'}
             </button>
+          </p>
+
+          {/* Mobile footer */}
+          <p className="lg:hidden font-body text-brand-slate text-[11px] text-center pt-2">
+            &copy; {new Date().getFullYear()} IURISPRUDENTIA
           </p>
         </div>
       </div>

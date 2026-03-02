@@ -283,3 +283,23 @@ html { scroll-behavior: smooth; }
 .glow-gold {
   box-shadow: 0 0 40px rgba(201,169,78,0.2), 0 0 80px rgba(201,169,78,0.08);
 }
+
+/* ─── Mobile Improvements ──────────────────────────── */
+@media (max-width: 1023px) {
+  .bg-grid {
+    background-size: 24px 24px;
+  }
+}
+
+/* Touch-friendly scrolling */
+.overflow-y-auto,
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe area padding for mobile */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
