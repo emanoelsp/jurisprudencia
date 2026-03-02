@@ -362,7 +362,7 @@ export default function AnalisarPage() {
       </div>
 
       {/* Mobile panel toggle */}
-      <div className="lg:hidden flex border-b border-brand-border flex-shrink-0">
+      <div className="md:hidden flex border-b border-brand-border flex-shrink-0">
         <button
           onClick={() => setMobilePanel('results')}
           className={`flex-1 py-2.5 text-xs font-semibold text-center transition-colors ${
@@ -400,7 +400,7 @@ export default function AnalisarPage() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* Left: Results (hidden on mobile when editor is active) */}
-        <div className={`w-full lg:w-[45%] border-r border-brand-border flex flex-col overflow-hidden ${mobilePanel === 'results' ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`w-full md:w-[45%] border-r border-brand-border flex flex-col overflow-hidden ${mobilePanel === 'results' ? 'flex' : 'hidden md:flex'}`}>
           <div className="flex items-center justify-between px-3 sm:px-5 py-2.5 sm:py-3 border-b border-brand-border bg-brand-navylt flex-shrink-0">
             <div className="flex items-center gap-2 flex-wrap">
               <Cpu size={14} className="text-brand-indigo flex-shrink-0" />
@@ -678,7 +678,7 @@ export default function AnalisarPage() {
         </div>
 
         {/* Right: Legal Editor (hidden on mobile when results is active) */}
-        <div className={`flex-1 flex flex-col overflow-hidden ${mobilePanel === 'editor' ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`flex-1 flex flex-col overflow-hidden ${mobilePanel === 'editor' ? 'flex' : 'hidden md:flex'}`}>
           <div className="flex items-center justify-between px-3 sm:px-5 py-2.5 sm:py-3 border-b border-brand-border bg-brand-navylt flex-shrink-0">
             <div className="flex items-center gap-2">
               <AlignLeft size={14} className="text-brand-gold" />
@@ -737,7 +737,7 @@ export default function AnalisarPage() {
       </div>
 
       {/* Mobile bottom action bar */}
-      <div className="lg:hidden flex items-center gap-2 px-3 py-2.5 bg-brand-navylt border-t border-brand-border flex-shrink-0">
+      <div className="md:hidden flex items-center gap-2 px-3 py-2.5 bg-brand-navylt border-t border-brand-border flex-shrink-0">
         <button onClick={() => handleSave(false)} disabled={saving} className="btn-ghost flex-1 justify-center text-xs py-2">
           {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
           Salvar

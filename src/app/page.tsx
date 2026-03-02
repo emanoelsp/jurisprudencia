@@ -190,7 +190,7 @@ export default function HomePage() {
 
         <div className="flex-1 flex flex-col items-center justify-center px-6 sm:px-10 py-10 lg:py-0">
           <div
-            className={`w-full max-w-sm space-y-7 transition-all duration-600 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            className={`w-full max-w-sm space-y-7 transition-all duration-[600ms] ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
           >
 
             {/* Mobile: Logo + Branding */}
@@ -299,14 +299,6 @@ export default function HomePage() {
                   </button>
                 </div>
               </div>
-
-              {mode === 'login' && (
-                <div className="flex justify-end">
-                  <button type="button" className="font-body text-brand-slate text-xs hover:text-brand-gold transition-colors">
-                    Esqueceu a senha?
-                  </button>
-                </div>
-              )}
 
               <button
                 type="submit"
