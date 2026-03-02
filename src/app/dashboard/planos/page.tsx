@@ -21,7 +21,7 @@ export default function PlanosPage() {
   async function handleCheckout(plan: PlanId) {
     if (!user) return
     if (plan === 'start') {
-      toast('Para Start Escritório, entre em contato comercial.', { icon: '📞' })
+      toast('Para Start Escritorio, entre em contato comercial.')
       return
     }
     if (plan === 'free') return
@@ -39,7 +39,7 @@ export default function PlanosPage() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Falha ao iniciar pagamento')
       const checkoutUrl = data.init_point || data.sandbox_init_point
-      if (!checkoutUrl) throw new Error('Checkout indisponível')
+      if (!checkoutUrl) throw new Error('Checkout indisponivel')
       window.location.href = checkoutUrl
     } catch (err: any) {
       toast.error(err.message || 'Falha no checkout')
@@ -49,18 +49,18 @@ export default function PlanosPage() {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6 animate-fade-in">
       <div>
-        <h1 className="section-title">Planos e Upgrade</h1>
+        <h1 className="section-title text-xl sm:text-2xl">Planos e Upgrade</h1>
         <p className="font-body text-brand-slate text-sm mt-1">
           Plano atual: <span className="text-brand-cream font-semibold">{PLAN_POLICIES[activePlan].name}</span>
           {activePlan === 'free' && (
-            <span> · {daysLeft ?? 0} dias restantes no free</span>
+            <span> -- {daysLeft ?? 0} dias restantes no free</span>
           )}
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         {ORDER.map(planId => {
           const plan = PLAN_POLICIES[planId]
           const active = activePlan === planId
@@ -76,14 +76,14 @@ export default function PlanosPage() {
 
               <div className="text-xs text-brand-slate space-y-1">
                 <p>{plan.limits.docsPerDay} documentos por dia</p>
-                <p>{plan.limits.maxUsers} usuário(s)</p>
-                <p>Até {plan.limits.maxProcesses} processos</p>
+                <p>{plan.limits.maxUsers} usuario(s)</p>
+                <p>Ate {plan.limits.maxProcesses} processos</p>
               </div>
 
               <div className="space-y-1">
                 {plan.perks.map(perk => (
                   <div key={perk} className="flex items-start gap-1.5 text-xs text-brand-slate">
-                    <ShieldCheck size={12} className="text-emerald-400 mt-0.5" />
+                    <ShieldCheck size={12} className="text-emerald-400 mt-0.5 flex-shrink-0" />
                     <span>{perk}</span>
                   </div>
                 ))}
@@ -91,7 +91,7 @@ export default function PlanosPage() {
 
               <div className="mt-auto">
                 {active ? (
-                  <div className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  <div className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                     <Crown size={12} />
                     Plano atual
                   </div>
@@ -111,10 +111,10 @@ export default function PlanosPage() {
         })}
       </div>
 
-      <div className="card p-4">
+      <div className="card p-4 sm:p-5">
         <p className="text-sm text-brand-cream font-semibold">Vantagens exclusivas dos planos pagos</p>
-        <p className="text-xs text-brand-slate mt-1">
-          Expandir tribunais, rerank avançado, fila prioritária e maior volume diário. O plano Trial não inclui esses recursos.
+        <p className="text-xs text-brand-slate mt-1 leading-relaxed">
+          Expandir tribunais, rerank avancado, fila prioritaria e maior volume diario. O plano Trial nao inclui esses recursos.
         </p>
       </div>
     </div>
