@@ -145,6 +145,7 @@ export default function AnalisarPage() {
     setCodigoPenalFromAnalysis([])
     setGeminiQuotaExceeded(false)
     setAnalysisConfidence(null)
+    setToonValid(null)
     setShowAgentModal(true)
     setAgentSteps(INITIAL_AGENT_STEPS.map((s, i) => ({ ...s, done: i === 0 })))
     abortRef.current = new AbortController()
@@ -271,9 +272,12 @@ export default function AnalisarPage() {
         break
       case 'complete':
         setStreamingId(null)
-        if ((chunk.data as any)?.id) setStreamingId(null)
+        setToonValid(prev => prev === null ? true : prev)
         break
       case 'error':
+        if (chunk.error && (chunk.error.includes('TOON') || chunk.error.includes('Violação TOON'))) {
+          setToonValid(false)
+        }
         toast.error(chunk.error || 'Erro desconhecido.')
         break
     }
@@ -376,7 +380,144 @@ export default function AnalisarPage() {
     : 0
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-56px)] lg:h-screen overflow-hidden">
+
+      {/* ── Modal: Relatório da análise ───────────────── */}
+      {showAgentModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => !analyzing && setShowAgentModal(false)}
+          role="dialog"
+          aria-labelledby="agent-modal-title"
+        >
+          <div
+            className="bg-brand-navy border border-brand-border rounded-xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 id="agent-modal-title" className="font-display font-bold text-brand-cream text-lg flex items-center gap-2">
+                <Sparkles size={20} className="text-brand-indigo" />
+                Relatório da análise
+              </h2>
+              {!analyzing && (
+                <button
+                  type="button"
+                  onClick={() => setShowAgentModal(false)}
+                  className="text-brand-slate hover:text-brand-cream p-1 rounded"
+                  aria-label="Fechar"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <p className="font-body text-brand-slate text-sm mb-4">
+              Uma visão clara do que foi feito e do nível de confiança nas sugestões.
+            </p>
+
+            <div className="rounded-lg border border-brand-border bg-black/10 p-4 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-slate/70">Etapas</p>
+                {analyzing ? (
+                  <span className="inline-flex items-center gap-2 text-xs text-brand-indigo font-body">
+                    <Loader2 size={14} className="animate-spin" /> Em andamento
+                  </span>
+                ) : (
+                  <span className="text-xs text-brand-slate font-body">Concluído</span>
+                )}
+              </div>
+              <ul className="space-y-3">
+                {agentSteps.map((step, i) => (
+                  <li key={i} className="flex items-start gap-3 font-body text-sm">
+                    <div className="mt-0.5 flex-shrink-0">
+                      {step.done ? (
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 border border-emerald-500/25">
+                          <CheckCircle size={14} className="text-emerald-400" />
+                        </span>
+                      ) : analyzing ? (
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-indigo/15 border border-brand-indigo/25">
+                          <Loader2 size={14} className="text-brand-indigo animate-spin" />
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-brand-border text-[10px] text-brand-slate font-mono">
+                          {i + 1}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className={`leading-snug ${step.done ? 'text-brand-cream' : 'text-brand-slate'}`}>{step.label}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {!analyzing && results.length > 0 && (
+              <div className="rounded-lg border border-brand-indigo/20 bg-brand-indigo/10 p-4 mb-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-slate/70 mb-2">Resumo</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-md border border-brand-border bg-black/10 p-2">
+                    <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Resultados</div>
+                    <div className="text-brand-cream font-display font-bold text-lg leading-tight">{results.length}</div>
+                  </div>
+                  <div className="rounded-md border border-brand-border bg-black/10 p-2">
+                    <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Confiança média</div>
+                    <div className="text-brand-cream font-display font-bold text-lg leading-tight">{avgConfidence > 0 ? `${avgConfidence}%` : '—'}</div>
+                  </div>
+                  <div className="rounded-md border border-brand-border bg-black/10 p-2">
+                    <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Ação</div>
+                    <div className="text-brand-slate text-xs leading-tight mt-1">Aprove apenas o que estiver bem fundamentado</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!analyzing && (
+              <div className={`rounded-lg p-4 mb-4 border ${avgConfidence >= 75 ? 'bg-emerald-500/10 border-emerald-500/20' : avgConfidence > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-brand-navylt border-brand-border'}`}>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-slate/70 mb-2">Confiabilidade</p>
+                <p className="font-body text-brand-cream text-sm mb-3">
+                  {avgConfidence >= 75 ? (
+                    <span className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Confiança geral alta nas sugestões.</span>
+                  ) : avgConfidence > 0 ? (
+                    <span className="inline-flex items-center gap-2"><AlertCircle size={16} className="text-amber-400" /> Confiança geral moderada/baixa. Revise com cuidado antes de usar.</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2"><AlertCircle size={16} className="text-brand-slate" /> Não foi possível calcular confiança.</span>
+                  )}
+                </p>
+                {analysisConfidence && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="bg-black/10 rounded-md p-3 border border-brand-border">
+                      <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Confiança da busca</div>
+                      <div className="text-brand-cream font-display font-bold text-base mt-1">{analysisConfidence.retrieval_confidence != null ? `${Math.round(analysisConfidence.retrieval_confidence * 100)}%` : '—'}</div>
+                    </div>
+                    <div className="bg-black/10 rounded-md p-3 border border-brand-border">
+                      <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Cobertura</div>
+                      <div className="text-brand-cream font-display font-bold text-base mt-1">{analysisConfidence.evidence_coverage != null ? `${Math.round(analysisConfidence.evidence_coverage * 100)}%` : '—'}</div>
+                    </div>
+                    <div className="bg-black/10 rounded-md p-3 border border-brand-border">
+                      <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Risco</div>
+                      <div className="text-brand-cream font-display font-bold text-base mt-1">{analysisConfidence.generation_risk != null ? `${Math.round(analysisConfidence.generation_risk * 100)}%` : '—'}</div>
+                    </div>
+                  </div>
+                )}
+                {geminiQuotaExceeded && (
+                  <p className="font-body text-amber-200 text-xs mt-3">
+                    A API Gemini atingiu limite no momento; as abas Bases, CP e CF/88 podem ter ficado vazias.
+                  </p>
+                )}
+              </div>
+            )}
+            {!analyzing && (
+              <button
+                type="button"
+                onClick={() => setShowAgentModal(false)}
+                className="btn-primary w-full py-2"
+              >
+                Fechar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Top Bar */}
       <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3 bg-brand-navylt border-b border-brand-border flex-shrink-0">
@@ -564,6 +705,10 @@ export default function AnalisarPage() {
               </div>
             )}
           </div>
+
+          <p className="px-3 sm:px-4 pt-2 text-[10px] text-brand-slate/80 font-body">
+            As sugestões são de apoio à decisão. A responsabilidade pela peça e pelas citações é do advogado.
+          </p>
 
           <div className="px-3 sm:px-4 pt-3 flex-shrink-0">
             <div className="flex gap-1.5 overflow-x-auto pb-1">

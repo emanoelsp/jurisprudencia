@@ -99,8 +99,8 @@ function validateCitation(item) {
   return (
     isNonEmptyString(item.numero) &&
     isNonEmptyString(item.tribunal) &&
-    isNonEmptyString(item.relator) &&
-    isNonEmptyString(item.dataJulgamento) &&
+    typeof item.relator === 'string' &&
+    typeof item.dataJulgamento === 'string' &&
     isNonEmptyString(item.trecho)
   )
 }

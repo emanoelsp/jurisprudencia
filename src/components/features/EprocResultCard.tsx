@@ -54,7 +54,9 @@ Relator: ${result.relator}, julgado em ${result.dataJulgamento}.`
                     ? 'LexML'
                     : result.fonte === 'stj_dados_abertos'
                       ? 'STJ Dados Abertos'
-                      : result.fonte}
+                      : result.fonte === 'base_interna'
+                        ? 'Base interna'
+                        : result.fonte}
               </span>
             )}
             {result.alreadyUsed && (
