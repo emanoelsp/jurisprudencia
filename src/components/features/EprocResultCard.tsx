@@ -22,8 +22,15 @@ EMENTA: ${result.ementa}
 Relator: ${result.relator}, julgado em ${result.dataJulgamento}.`
   }
 
+  const isLowConfidence = result.badge === 'baixa'
+  const isHighConfidence = result.badge === 'alta'
+
   return (
-    <div className={`card overflow-hidden transition-all duration-300 ${index === 0 ? 'border-brand-indigo/30' : ''}`}>
+    <div
+      className={`card overflow-hidden transition-all duration-300 ${
+        index === 0 ? 'border-brand-indigo/30' : ''
+      } ${isLowConfidence ? 'opacity-90 border-amber-500/20' : ''} ${isHighConfidence ? 'border-emerald-500/20' : ''}`}
+    >
       {/* Header */}
       <div
         className="flex items-start gap-3 p-4 cursor-pointer hover:bg-brand-navy/40 transition-colors"
@@ -36,9 +43,18 @@ Relator: ${result.relator}, julgado em ${result.dataJulgamento}.`
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
             <span className="font-body font-semibold text-brand-cream text-sm">{result.tribunal}</span>
             <ConfidenceBadge badge={result.badge} score={result.rerankScore ?? result.score} />
+            {isLowConfidence && (
+              <span className="text-[10px] text-amber-400/90 italic">Revisar com cuidado</span>
+            )}
             {result.fonte && (
               <span className="text-[10px] px-2 py-0.5 rounded-full border border-brand-border text-brand-slate">
-                {result.fonte === 'datajud_cnj' ? 'DataJud CNJ' : result.fonte}
+                {result.fonte === 'datajud_cnj'
+                  ? 'DataJud CNJ'
+                  : result.fonte === 'lexml'
+                    ? 'LexML'
+                    : result.fonte === 'stj_dados_abertos'
+                      ? 'STJ Dados Abertos'
+                      : result.fonte}
               </span>
             )}
             {result.alreadyUsed && (

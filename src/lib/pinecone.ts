@@ -1,3 +1,9 @@
+/**
+ * Pinecone client: query e upsert para RAG (jurisprudência, legislação).
+ * Alinhado ao [Node.js SDK](https://docs.pinecone.io/reference/sdks/node/overview):
+ * - Produção: target por host (PINECONE_HOST) para evitar describeIndex em toda requisição.
+ * - IndexOptions: host ou name; namespace opcional (legislacao, jurisprudencia_publica, cli-*).
+ */
 import { Pinecone } from '@pinecone-database/pinecone'
 import type { RecordMetadata, RecordMetadataValue } from '@pinecone-database/pinecone'
 
@@ -21,7 +27,8 @@ function getPineconeIndex(namespaceOverride?: string) {
   if (!cfg) return null
 
   const pc = new Pinecone({ apiKey: cfg.apiKey })
-  const namespace = namespaceOverride || cfg.namespace
+  const namespace = namespaceOverride ?? cfg.namespace ?? ''
+  // Preferir host (produção); sem host usa name e o SDK chama describeIndex
   const index = cfg.host
     ? pc.index({ host: cfg.host, ...(namespace ? { namespace } : {}) })
     : cfg.indexName

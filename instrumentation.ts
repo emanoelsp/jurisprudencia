@@ -1,5 +1,6 @@
 // Next.js Instrumentation - executa no startup do servidor
-// Faz seed automático de CF/88 e Código Penal no primeiro run
+// Faz seed automático de CF/88 e Código Penal no primeiro run (apenas em dev/local;
+// no Vercel não roda, para você injetar uma única vez via API e todos os clientes usarem o mesmo RAG).
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
@@ -23,7 +24,12 @@ export async function register() {
       }
     }
 
-    if (!isSeeded() && process.env.PINECONE_API_KEY && process.env.PINECONE_HOST && process.env.GEMINI_API_KEY) {
+    const isVercel = process.env.VERCEL === '1'
+    const skipSeed =
+      isVercel ||
+      process.env.SKIP_LEGISLACAO_SEED === 'true' ||
+      process.env.SKIP_LEGISLACAO_SEED === '1'
+    if (!skipSeed && !isSeeded() && process.env.PINECONE_API_KEY && process.env.PINECONE_HOST && process.env.GEMINI_API_KEY) {
       // Executa seed em background (não bloqueia startup)
       setImmediate(async () => {
         try {

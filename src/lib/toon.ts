@@ -73,25 +73,55 @@ export function validateToonIntegrity(
   payloads: ToonPayload[]
 ): { valid: boolean; violations: string[] } {
   const violations: string[] = []
-
-  for (const p of payloads) {
-    // Check if the process number appears verbatim in output
-    if (llmOutput.includes(p.ementaHash)) {
-      // Hash reference found - valid
-    }
-
-    // Extract any process number patterns from LLM output
-    const cnj = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/g
-    const matches = llmOutput.match(cnj) || []
-
-    for (const match of matches) {
-      const isKnown = payloads.some((tp) => tp.numeroProcesso === match)
-      if (!isKnown) {
-        violations.push(`Número de processo não reconhecido: ${match}`)
-      }
+  const cnj = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/g
+  const matches = llmOutput.match(cnj) || []
+  for (const match of matches) {
+    const isKnown = payloads.some((tp) => tp.numeroProcesso === match)
+    if (!isKnown) {
+      violations.push(`Número de processo não reconhecido: ${match}`)
     }
   }
+  return { valid: violations.length === 0, violations }
+}
 
+/**
+ * Valida que cada citação no JSON da justificativa bate com um payload TOON
+ * (evita troca de relator/tribunal/data entre processos)
+ */
+export function validateJustificationCitations(
+  citacoes: Array<{ numero?: string; tribunal?: string; relator?: string; dataJulgamento?: string }>,
+  payloads: ToonPayload[]
+): { valid: boolean; violations: string[] } {
+  const violations: string[] = []
+  const normDate = (s: string) => (s || '').trim().replace(/\D/g, '').slice(0, 8)
+  for (const c of citacoes || []) {
+    const num = (c.numero || '').trim()
+    if (!num) continue
+    const p = payloads.find((tp) => tp.numeroProcesso === num)
+    if (!p) {
+      violations.push(`Citação com número não presente no TOON: ${num}`)
+      continue
+    }
+    const tribunalOk =
+      !(c.tribunal || '').trim() ||
+      (p.tribunal || '').trim().toLowerCase().includes((c.tribunal || '').trim().toLowerCase()) ||
+      (c.tribunal || '').trim().toLowerCase().includes((p.tribunal || '').trim().toLowerCase())
+    if (!tribunalOk) {
+      violations.push(`Tribunal da citação não confere com o TOON: ${num}`)
+    }
+    const relatorOk =
+      !(c.relator || '').trim() ||
+      (p.relator || '').trim().toLowerCase().includes((c.relator || '').trim().toLowerCase()) ||
+      (c.relator || '').trim().toLowerCase().includes((p.relator || '').trim().toLowerCase())
+    if (!relatorOk) {
+      violations.push(`Relator da citação não confere com o TOON: ${num}`)
+    }
+    const dataCit = normDate((c as any).dataJulgamento || '')
+    const dataToon = normDate(p.dataJulgamento || '')
+    if (dataCit && dataToon && dataCit !== dataToon) {
+      violations.push(`Data de julgamento da citação não confere com o TOON: ${num}`)
+    }
+  }
   return { valid: violations.length === 0, violations }
 }
 

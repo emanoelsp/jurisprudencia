@@ -27,6 +27,19 @@ const LEGAL_KEYWORDS = [
   'trabalhista',
   'consumidor',
   'oab',
+  'decisão',
+  'decisao',
+  'embargos',
+  'agravo',
+  'execução',
+  'execucao',
+  'penhora',
+  'mandado',
+  'habeas',
+  'apelação',
+  'apelacao',
+  'recurso especial',
+  'recurso extraordinário',
 ]
 
 function isObject(value) {

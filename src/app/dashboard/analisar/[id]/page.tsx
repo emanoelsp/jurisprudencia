@@ -11,7 +11,7 @@ import EprocResultCard from '@/components/features/EprocResultCard'
 import {
   Sparkles, Save, CheckCircle, AlertCircle,
   ArrowLeft, FileText, Loader2, Cpu,
-  Shield, AlignLeft, Library, Database, Scale, BookOpen, Gavel,
+  Shield, AlignLeft, Library, Database, Scale, BookOpen, Gavel, ChevronDown,
 } from 'lucide-react'
 import { statusLabel, statusColor, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -24,6 +24,16 @@ const TRIBUNAL_OPTIONS = [
   'TJAC', 'TJAL', 'TJAM', 'TJAP', 'TJBA', 'TJCE', 'TJDFT', 'TJES', 'TJGO',
   'TJMA', 'TJMG', 'TJMS', 'TJMT', 'TJPA', 'TJPB', 'TJPE', 'TJPI', 'TJPR',
   'TJRJ', 'TJRN', 'TJRO', 'TJRR', 'TJRS', 'TJSC', 'TJSE', 'TJSP', 'TJTO',
+]
+
+const TRIBUNAL_GROUPS: { label: string; options: string[] }[] = [
+  { label: 'Todos os tribunais', options: ['TODOS'] },
+  { label: 'Superiores', options: ['STF', 'STJ', 'TST', 'TSE', 'STM'] },
+  { label: 'TRFs', options: ['TRF1', 'TRF2', 'TRF3', 'TRF4', 'TRF5', 'TRF6'] },
+  {
+    label: 'TJs',
+    options: ['TJAC', 'TJAL', 'TJAM', 'TJAP', 'TJBA', 'TJCE', 'TJDFT', 'TJES', 'TJGO', 'TJMA', 'TJMG', 'TJMS', 'TJMT', 'TJPA', 'TJPB', 'TJPE', 'TJPI', 'TJPR', 'TJRJ', 'TJRN', 'TJRO', 'TJRR', 'TJRS', 'TJSC', 'TJSE', 'TJSP', 'TJTO'],
+  },
 ]
 
 export default function AnalisarPage() {
@@ -42,15 +52,65 @@ export default function AnalisarPage() {
   const [saving, setSaving]               = useState(false)
   const [toonValid, setToonValid]         = useState<boolean | null>(null)
   const [usedPareceres, setUsedPareceres] = useState<JurisprudenciaCriada[]>([])
+  const [knowledgeBasePareceres, setKnowledgeBasePareceres] = useState<JurisprudenciaCriada[]>([])
   const [leftTab, setLeftTab] = useState<'datajud' | 'bases_publicas' | 'codigo_penal' | 'constitucional' | 'pareceres'>('datajud')
   const [selectedTribunal, setSelectedTribunal] = useState('TJSP')
+  const [tribunalDropdownOpen, setTribunalDropdownOpen] = useState(false)
+  const tribunalDropdownRef = useRef<HTMLDivElement>(null)
   const [cfArticlesFromAnalysis, setCfArticlesFromAnalysis] = useState<Array<{ id: string; titulo: string; texto: string; aplicabilidade?: string }>>([])
   const [basesPublicasFromAnalysis, setBasesPublicasFromAnalysis] = useState<Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }>>([])
   const [codigoPenalFromAnalysis, setCodigoPenalFromAnalysis] = useState<Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }>>([])
   const [geminiQuotaExceeded, setGeminiQuotaExceeded] = useState(false)
+  const [analysisConfidence, setAnalysisConfidence] = useState<{
+    retrieval_confidence?: number
+    evidence_coverage?: number
+    generation_risk?: number
+  } | null>(null)
+  const [showAgentModal, setShowAgentModal] = useState(false)
+  const [agentSteps, setAgentSteps] = useState<Array<{ label: string; done: boolean }>>([])
   const abortRef = useRef<AbortController | null>(null)
 
+  const INITIAL_AGENT_STEPS = [
+    { label: 'Analisei o texto do seu processo para entender o tema e os pedidos.', done: false },
+    { label: 'Busquei jurisprudências compatíveis no DataJud (tribunais) e no seu acervo interno.', done: false },
+    { label: 'Ordenei os resultados por relevância (rerank) e atribuí um percentual de confiança a cada um.', done: false },
+    { label: 'Identifiquei artigos da Constituição Federal e do Código Penal aplicáveis ao caso.', done: false },
+    { label: 'Gerei justificativas em linguagem natural para cada jurisprudência sugerida.', done: false },
+  ]
+
   useEffect(() => { loadProcesso() }, [id])
+
+  const loadKnowledgeBase = useCallback(async () => {
+    try {
+      const res = await fetch('/api/jurisprudencia', { headers: await getAuthHeaders() })
+      if (!res.ok) return
+      const data = await res.json()
+      const items = (data.items || []).map((i: JurisprudenciaCriada) => ({
+        ...i,
+        usageCount: i.processoIds?.length || (i.processoId ? 1 : 0),
+      }))
+      setKnowledgeBasePareceres(items)
+    } catch {
+      // ignore
+    }
+  }, [user?.uid])
+
+  useEffect(() => {
+    if (!user) return
+    loadKnowledgeBase()
+  }, [user?.uid, loadKnowledgeBase])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (tribunalDropdownRef.current && !tribunalDropdownRef.current.contains(e.target as Node)) {
+        setTribunalDropdownOpen(false)
+      }
+    }
+    if (tribunalDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [tribunalDropdownOpen])
 
   async function loadProcesso() {
     const snap = await getDoc(doc(db, 'processos', id))
@@ -83,6 +143,9 @@ export default function AnalisarPage() {
     setBasesPublicasFromAnalysis([])
     setCodigoPenalFromAnalysis([])
     setGeminiQuotaExceeded(false)
+    setAnalysisConfidence(null)
+    setShowAgentModal(true)
+    setAgentSteps(INITIAL_AGENT_STEPS.map((s, i) => ({ ...s, done: i === 0 })))
     abortRef.current = new AbortController()
     const t0 = performance.now()
     let chunkCount = 0
@@ -107,11 +170,7 @@ export default function AnalisarPage() {
 
       if (!res.ok) {
         const errorMessage = await res.text()
-        if (res.status === 422) {
-          toast.error('Texto fora do escopo jurídico-processual. Envie uma peça processual para análise.')
-        } else {
-          toast.error(errorMessage || 'Erro na análise. Tente novamente.')
-        }
+        toast.error(errorMessage || 'Erro na análise. Tente novamente.')
         return
       }
 
@@ -165,16 +224,33 @@ export default function AnalisarPage() {
   function handleChunk(chunk: AnalysisChunk) {
     switch (chunk.type) {
       case 'results':
-        if (chunk.results) setResults(chunk.results)
+        if (chunk.results) {
+          setResults(chunk.results)
+          setAgentSteps(prev => prev.map((s, i) => (i === 1 || i === 2 ? { ...s, done: true } : s)))
+        }
         break
       case 'metadata':
         if (chunk.usedPareceres) setUsedPareceres(chunk.usedPareceres)
         if ((chunk.data as any)?.cf_articles) setCfArticlesFromAnalysis((chunk.data as any).cf_articles)
         if ((chunk.data as any)?.bases_publicas) setBasesPublicasFromAnalysis((chunk.data as any).bases_publicas)
         if ((chunk.data as any)?.codigo_penal) setCodigoPenalFromAnalysis((chunk.data as any).codigo_penal)
+        if (
+          typeof (chunk.data as any)?.retrieval_confidence === 'number' ||
+          typeof (chunk.data as any)?.evidence_coverage === 'number' ||
+          typeof (chunk.data as any)?.generation_risk === 'number'
+        ) {
+          setAnalysisConfidence(prev => ({
+            ...(prev || {}),
+            retrieval_confidence: (chunk.data as any)?.retrieval_confidence ?? prev?.retrieval_confidence,
+            evidence_coverage: (chunk.data as any)?.evidence_coverage ?? prev?.evidence_coverage,
+            generation_risk: (chunk.data as any)?.generation_risk ?? prev?.generation_risk,
+          }))
+        }
+        if ((chunk.data as any)?.cf_articles?.length || (chunk.data as any)?.codigo_penal?.length) {
+          setAgentSteps(prev => prev.map((s, i) => (i === 3 ? { ...s, done: true } : s)))
+        }
         if ((chunk.data as any)?.gemini_quota_exceeded) {
           setGeminiQuotaExceeded(true)
-          toast.error('Limite da API Gemini atingido. As abas Bases, CP e CF/88 ficaram vazias. Aguarde alguns minutos ou verifique billing.', { duration: 6000 })
         }
         break
       case 'justification':
@@ -185,6 +261,7 @@ export default function AnalisarPage() {
             ...prev,
             [id]: (prev[id] || '') + chunk.text,
           }))
+          setAgentSteps(prev => prev.map((s, i) => (i === 4 ? { ...s, done: true } : s)))
         }
         break
       case 'complete':
@@ -225,6 +302,7 @@ export default function AnalisarPage() {
       }
       await updateDoc(doc(db, 'processos', id), upd)
       setProcesso(p => p ? { ...p, ...upd } : p)
+      if (approve) loadKnowledgeBase()
       toast.success(approve ? 'Processo aprovado e salvo!' : 'Rascunho salvo!')
     } catch (err: any) {
       console.error('[save] failed', err)
@@ -276,8 +354,151 @@ export default function AnalisarPage() {
 
   if (!processo) return null
 
+  const avgConfidence = results.length
+    ? Math.round(
+        results.reduce((s, r) => s + (r.rerankScore ?? r.score) * 100, 0) / results.length
+      )
+    : 0
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
+
+      {/* ── Modal: O que o agente fez (linguagem natural) ───────────────── */}
+      {showAgentModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => !analyzing && setShowAgentModal(false)}
+          role="dialog"
+          aria-labelledby="agent-modal-title"
+        >
+          <div
+            className="bg-brand-navy border border-brand-border rounded-xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 id="agent-modal-title" className="font-display font-bold text-brand-cream text-lg flex items-center gap-2">
+                <Sparkles size={20} className="text-brand-indigo" />
+                Relatório da análise
+              </h2>
+              {!analyzing && (
+                <button
+                  type="button"
+                  onClick={() => setShowAgentModal(false)}
+                  className="text-brand-slate hover:text-brand-cream p-1 rounded"
+                  aria-label="Fechar"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <p className="font-body text-brand-slate text-sm mb-4">
+              Uma visão clara do que foi feito e do nível de confiança nas sugestões.
+            </p>
+
+            <div className="rounded-lg border border-brand-border bg-black/10 p-4 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-slate/70">Etapas</p>
+                {analyzing ? (
+                  <span className="inline-flex items-center gap-2 text-xs text-brand-indigo font-body">
+                    <Loader2 size={14} className="animate-spin" /> Em andamento
+                  </span>
+                ) : (
+                  <span className="text-xs text-brand-slate font-body">Concluído</span>
+                )}
+              </div>
+              <ul className="space-y-3">
+              {agentSteps.map((step, i) => (
+                <li key={i} className="flex items-start gap-3 font-body text-sm">
+                  <div className="mt-0.5 flex-shrink-0">
+                    {step.done ? (
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 border border-emerald-500/25">
+                        <CheckCircle size={14} className="text-emerald-400" />
+                      </span>
+                    ) : analyzing ? (
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-indigo/15 border border-brand-indigo/25">
+                        <Loader2 size={14} className="text-brand-indigo animate-spin" />
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-brand-border text-[10px] text-brand-slate font-mono">
+                        {i + 1}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className={`leading-snug ${step.done ? 'text-brand-cream' : 'text-brand-slate'}`}>{step.label}</div>
+                  </div>
+                </li>
+              ))}
+              </ul>
+            </div>
+
+            {!analyzing && results.length > 0 && (
+              <div className="rounded-lg border border-brand-indigo/20 bg-brand-indigo/10 p-4 mb-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-slate/70 mb-2">Resumo</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-md border border-brand-border bg-black/10 p-2">
+                    <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Resultados</div>
+                    <div className="text-brand-cream font-display font-bold text-lg leading-tight">{results.length}</div>
+                  </div>
+                  <div className="rounded-md border border-brand-border bg-black/10 p-2">
+                    <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Confiança média</div>
+                    <div className="text-brand-cream font-display font-bold text-lg leading-tight">{avgConfidence > 0 ? `${avgConfidence}%` : '—'}</div>
+                  </div>
+                  <div className="rounded-md border border-brand-border bg-black/10 p-2">
+                    <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Ação</div>
+                    <div className="text-brand-slate text-xs leading-tight mt-1">Aprove apenas o que estiver bem fundamentado</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!analyzing && (
+              <div className={`rounded-lg p-4 mb-4 border ${avgConfidence >= 75 ? 'bg-emerald-500/10 border-emerald-500/20' : avgConfidence > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-brand-navylt border-brand-border'}`}>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-slate/70 mb-2">Confiabilidade</p>
+                <p className="font-body text-brand-cream text-sm mb-3">
+                  {avgConfidence >= 75 ? (
+                    <span className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Confiança geral alta nas sugestões.</span>
+                  ) : avgConfidence > 0 ? (
+                    <span className="inline-flex items-center gap-2"><AlertCircle size={16} className="text-amber-400" /> Confiança geral moderada/baixa. Revise com cuidado antes de usar.</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2"><AlertCircle size={16} className="text-brand-slate" /> Não foi possível calcular confiança.</span>
+                  )}
+                </p>
+                {analysisConfidence && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="bg-black/10 rounded-md p-3 border border-brand-border">
+                      <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Confiança da busca</div>
+                      <div className="text-brand-cream font-display font-bold text-base mt-1">{analysisConfidence.retrieval_confidence != null ? `${Math.round(analysisConfidence.retrieval_confidence * 100)}%` : '—'}</div>
+                    </div>
+                    <div className="bg-black/10 rounded-md p-3 border border-brand-border">
+                      <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Cobertura</div>
+                      <div className="text-brand-cream font-display font-bold text-base mt-1">{analysisConfidence.evidence_coverage != null ? `${Math.round(analysisConfidence.evidence_coverage * 100)}%` : '—'}</div>
+                    </div>
+                    <div className="bg-black/10 rounded-md p-3 border border-brand-border">
+                      <div className="text-[10px] text-brand-slate/70 font-semibold uppercase tracking-wider">Risco</div>
+                      <div className="text-brand-cream font-display font-bold text-base mt-1">{analysisConfidence.generation_risk != null ? `${Math.round(analysisConfidence.generation_risk * 100)}%` : '—'}</div>
+                    </div>
+                  </div>
+                )}
+                {geminiQuotaExceeded && (
+                  <p className="font-body text-amber-200 text-xs mt-3">
+                    A API Gemini atingiu limite no momento; as abas Bases, CP e CF/88 podem ter ficado vazias.
+                  </p>
+                )}
+              </div>
+            )}
+            {!analyzing && (
+              <button
+                type="button"
+                onClick={() => setShowAgentModal(false)}
+                className="btn-primary w-full py-2"
+              >
+                Fechar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Top Bar ─────────────────────────────────────── */}
       <div className="flex items-center gap-4 px-6 py-3 bg-brand-navylt border-b border-brand-border flex-shrink-0">
@@ -348,21 +569,65 @@ export default function AnalisarPage() {
                   {processo.tribunal || 'TODOS'}
                 </span>
               ) : (
-                <select
-                  value={selectedTribunal}
-                  onChange={e => setSelectedTribunal(e.target.value)}
-                  className="bg-brand-navy border border-brand-border rounded-md text-[11px] text-brand-slate px-2 py-1"
-                  disabled={analyzing}
-                >
-                  {TRIBUNAL_OPTIONS.map(sigla => (
-                    <option key={sigla} value={sigla}>{sigla}</option>
-                  ))}
-                </select>
+                <div ref={tribunalDropdownRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => !analyzing && setTribunalDropdownOpen(o => !o)}
+                    disabled={analyzing}
+                    className="inline-flex items-center gap-1.5 bg-brand-navy border border-brand-border hover:border-brand-indigo/40 rounded-lg text-xs font-medium text-brand-cream px-3 py-2 min-w-[5rem] transition-colors disabled:opacity-50"
+                  >
+                    <span className="font-mono">{selectedTribunal}</span>
+                    <ChevronDown size={14} className={`text-brand-slate shrink-0 transition-transform ${tribunalDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {tribunalDropdownOpen && (
+                    <div className="absolute left-0 top-full z-50 mt-1.5 w-56 rounded-xl border border-brand-border bg-brand-navylt shadow-xl overflow-hidden">
+                      <div className="max-h-[280px] overflow-y-auto py-2">
+                        {TRIBUNAL_GROUPS.map(({ label, options }) => (
+                          <div key={label}>
+                            <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-brand-slate/70 border-b border-brand-border/50">
+                              {label}
+                            </div>
+                            {options.map(sigla => (
+                              <button
+                                key={sigla}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTribunal(sigla)
+                                  setTribunalDropdownOpen(false)
+                                }}
+                                className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-xs font-mono transition-colors ${
+                                  selectedTribunal === sigla
+                                    ? 'bg-brand-indigo/20 text-brand-indigo'
+                                    : 'text-brand-slate hover:bg-brand-navy hover:text-brand-cream'
+                                }`}
+                              >
+                                <span>{sigla}</span>
+                                {selectedTribunal === sigla && <CheckCircle size={14} className="text-brand-indigo shrink-0" />}
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
               {results.length > 0 && (
-                <span className="bg-brand-indigo/20 text-brand-indigo text-xs px-2 py-0.5 rounded-full font-mono">
-                  {results.length}
-                </span>
+                <>
+                  <span className="bg-brand-indigo/20 text-brand-indigo text-xs px-2 py-0.5 rounded-full font-mono">
+                    {results.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAgentModal(true)
+                      if (results.length > 0) setAgentSteps(INITIAL_AGENT_STEPS.map(s => ({ ...s, done: true })))
+                    }}
+                    className="text-brand-indigo hover:text-brand-cream text-xs font-body"
+                  >
+                    O que o agente fez
+                  </button>
+                </>
               )}
             </div>
             {analyzing && (
@@ -373,6 +638,9 @@ export default function AnalisarPage() {
             )}
           </div>
 
+	          <p className="px-4 pt-2 text-[10px] text-brand-slate/80 font-body">
+              As sugestões são de apoio à decisão. A responsabilidade pela peça e pelas citações é do advogado.
+            </p>
 	          <div className="px-4 pt-3 space-y-3">
               <div className="grid grid-cols-5 gap-1.5">
                 <button
@@ -477,22 +745,22 @@ export default function AnalisarPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center gap-4 text-center py-12">
-                    <div className="w-14 h-14 rounded-2xl bg-brand-indigo/10 border border-brand-indigo/20 flex items-center justify-center">
-                      <BookOpen size={24} className="text-brand-indigo" />
+                  <div className="flex items-start gap-3 py-6">
+                    <div className="w-10 h-10 rounded-lg bg-brand-indigo/10 border border-brand-indigo/20 flex items-center justify-center flex-shrink-0">
+                      <BookOpen size={20} className="text-brand-indigo" />
                     </div>
                     <div>
                       <p className="font-body font-semibold text-brand-cream text-sm">Bases públicas</p>
                       {geminiQuotaExceeded ? (
-                        <p className="font-body text-amber-400 text-xs mt-1 max-w-xs">
+                        <p className="font-body text-amber-400 text-xs mt-1">
                           Limite da API Gemini atingido. Aguarde alguns minutos ou verifique billing em <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev</a>.
                         </p>
                       ) : (
                         <>
-                          <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
+                          <p className="font-body text-brand-slate text-xs mt-1">
                             Execute a análise para que a IA pesquise legislação, súmulas e jurisprudência consolidada relevantes ao processo.
                           </p>
-                          <div className="flex flex-wrap justify-center gap-2 mt-3">
+                          <div className="flex flex-wrap gap-2 mt-2">
                             <a href="https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-indigo hover:underline">CF/88</a>
                             <a href="https://www2.senado.leg.br/bdsf/bitstream/handle/id/608973/Codigo_penal_6ed.pdf?sequence=1&isAllowed=y" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-indigo hover:underline">Código Penal</a>
                           </div>
@@ -531,19 +799,19 @@ export default function AnalisarPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center gap-4 text-center py-12">
-                    <div className="w-14 h-14 rounded-2xl bg-brand-indigo/10 border border-brand-indigo/20 flex items-center justify-center">
-                      <Gavel size={24} className="text-brand-indigo" />
+                  <div className="flex items-start gap-3 py-6">
+                    <div className="w-10 h-10 rounded-lg bg-brand-indigo/10 border border-brand-indigo/20 flex items-center justify-center flex-shrink-0">
+                      <Gavel size={20} className="text-brand-indigo" />
                     </div>
                     <div>
                       <p className="font-body font-semibold text-brand-cream text-sm">Código Penal</p>
                       {geminiQuotaExceeded ? (
-                        <p className="font-body text-amber-400 text-xs mt-1 max-w-xs">
+                        <p className="font-body text-amber-400 text-xs mt-1">
                           Limite da API Gemini atingido. Aguarde alguns minutos ou verifique billing em <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev</a>.
                         </p>
                       ) : (
                         <>
-                          <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
+                          <p className="font-body text-brand-slate text-xs mt-1">
                             Execute a análise para que a IA identifique os artigos do CP aplicáveis ao processo.
                           </p>
                           <a href="https://www2.senado.leg.br/bdsf/bitstream/handle/id/608973/Codigo_penal_6ed.pdf?sequence=1&isAllowed=y" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-indigo hover:underline mt-2 inline-block">Código Penal (Senado)</a>
@@ -579,19 +847,19 @@ export default function AnalisarPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center gap-4 text-center py-12">
-                    <div className="w-14 h-14 rounded-2xl bg-brand-gold/10 border border-brand-gold/20 flex items-center justify-center">
-                      <Scale size={24} className="text-brand-gold" />
+                  <div className="flex items-start gap-3 py-6">
+                    <div className="w-10 h-10 rounded-lg bg-brand-gold/10 border border-brand-gold/20 flex items-center justify-center flex-shrink-0">
+                      <Scale size={20} className="text-brand-gold" />
                     </div>
                     <div>
                       <p className="font-body font-semibold text-brand-cream text-sm">Artigos da CF/88 aplicáveis</p>
                       {geminiQuotaExceeded ? (
-                        <p className="font-body text-amber-400 text-xs mt-1 max-w-xs">
+                        <p className="font-body text-amber-400 text-xs mt-1">
                           Limite da API Gemini atingido. Aguarde alguns minutos ou verifique billing em <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev</a>.
                         </p>
                       ) : (
                         <>
-                          <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
+                          <p className="font-body text-brand-slate text-xs mt-1">
                             Execute a análise para que a IA identifique, com base no processo e na Constituição (Planalto), quais artigos se enquadram.
                           </p>
                           <a href="https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-gold hover:underline mt-2 inline-block">Constituição Federal (Planalto)</a>
@@ -604,22 +872,23 @@ export default function AnalisarPage() {
             )}
 
             {leftTab === 'pareceres' && (
-              <>
-                {usedPareceres.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-12">
-                    <div className="w-14 h-14 rounded-2xl bg-brand-gold/10 border border-brand-gold/20 flex items-center justify-center">
-                      <Library size={24} className="text-brand-gold" />
+              <div className="space-y-3 px-4 pb-4">
+                {knowledgeBasePareceres.length === 0 ? (
+                  <div className="flex items-start gap-3 py-6">
+                    <div className="w-10 h-10 rounded-lg bg-brand-gold/10 border border-brand-gold/20 flex items-center justify-center flex-shrink-0">
+                      <Library size={20} className="text-brand-gold" />
                     </div>
                     <div>
-                      <p className="font-body font-semibold text-brand-cream text-sm">Nenhum parecer reutilizável encontrado</p>
-                      <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
-                        Ao aprovar resultados, sua base interna é atualizada para reuso em análises futuras.
+                      <p className="font-body font-semibold text-brand-cream text-sm">Base de conhecimento</p>
+                      <p className="font-body text-brand-slate text-xs mt-1">
+                        Nenhuma jurisprudência aprovada ainda. Ao clicar em <strong>Aprovar</strong> nos resultados da análise, os pareceres passam a integrar sua base para reuso em outros processos.
                       </p>
                     </div>
                   </div>
-                )}
-
-                {usedPareceres.map((item, idx) => (
+                ) : (
+                  <>
+                    <p className="font-body text-xs font-semibold text-brand-gold">Jurisprudências já usadas (sua base)</p>
+                    {knowledgeBasePareceres.map((item, idx) => (
                   <div key={`${item.id}-${idx}`} className="card p-4 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-body text-sm font-semibold text-brand-cream truncate">
@@ -634,11 +903,13 @@ export default function AnalisarPage() {
                       onClick={() => insertText(`${item.tribunal} – ${item.numero}\nEMENTA: ${item.ementa}\nRelator: ${item.relator || 'N/D'}, julgado em ${item.dataJulgamento || 'N/D'}.`)}
                       className="btn-ghost text-xs py-1.5 px-2"
                     >
-                      Inserir parecer reutilizado
+                      Inserir no editor
                     </button>
                   </div>
                 ))}
-              </>
+                  </>
+                )}
+              </div>
             )}
 	          </div>
 	        </div>

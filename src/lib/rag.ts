@@ -6,6 +6,7 @@ import { aiClient, aiModels } from './ai'
 import { parseExtractedMetadataJson } from './guards'
 import { queryPinecone } from './pinecone'
 import { fetchDataJudByQuery } from './datajud'
+import { fetchLexMLByQuery } from './lexml'
 
 const EMBEDDING_CACHE_TTL_MS = 30 * 60 * 1000
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000
@@ -246,6 +247,34 @@ function fuseWithRRF(
   return fused
 }
 
+/** Busca LexML (legislação, normas, jurisprudência) – retorna EprocResult[] ou [] */
+async function fetchLexMLResults(
+  queryText: string,
+  topK: number
+): Promise<EprocResult[]> {
+  if (process.env.LEXML_ENABLED === 'false') return []
+  try {
+    const docs = await fetchLexMLByQuery({
+      queryText,
+      size: Math.min(topK, 6),
+    })
+    return docs.map((d, i) => ({
+      id: d.id,
+      numero: d.urn || d.id,
+      ementa: d.ementa,
+      tribunal: d.autoridade || d.localidade || 'LexML',
+      relator: '',
+      dataJulgamento: d.data || '',
+      score: 0.75 - i * 0.05,
+      badge: scoreToBadge(0.75 - i * 0.05) as 'alta' | 'media' | 'baixa',
+      fonte: 'lexml' as const,
+    }))
+  } catch (err) {
+    console.warn('[rag] lexml query failed', err)
+    return []
+  }
+}
+
 /** Busca DataJud (keyword/sparse) – retorna EprocResult[] ou [] */
 async function fetchDataJudResults(
   queryText: string,
@@ -317,9 +346,11 @@ async function fetchPineconeResults(
         return true
       })
       .map(({ m }, i): EprocResult => {
-        const fonteRaw = m.metadata?.fonte as string | undefined
-        const fonte: 'datajud_cnj' | 'base_interna' | 'mock' =
-          fonteRaw === 'datajud_cnj' || fonteRaw === 'mock' ? fonteRaw : 'base_interna'
+        const fonteRaw = m.metadata?.fonte
+        const fonte: EprocResult['fonte'] =
+          fonteRaw === 'datajud_cnj' || fonteRaw === 'mock' || fonteRaw === 'lexml' || fonteRaw === 'stj_dados_abertos'
+            ? fonteRaw
+            : 'base_interna'
         return {
           id: String(m.id || `pc-${i}`),
           numero: String(m.metadata?.numero || m.metadata?.processo || m.metadata?.titulo || ''),
@@ -360,11 +391,15 @@ export async function searchHybrid(
 
   let results: EprocResult[] = []
 
+  // LexML (legislação/normas) em paralelo – complementar
+  const lexmlPromise = fetchLexMLResults(queryText, 4)
+
   if (hasDataJud && hasPinecone) {
     // Híbrido: DataJud + Pinecone em paralelo → RRF
-    const [dataJudRes, pineconeRes] = await Promise.all([
+    const [dataJudRes, pineconeRes, lexmlRes] = await Promise.all([
       fetchDataJudResults(queryText, tribunal, topK + 4),
       fetchPineconeResults(queryText, topK + 4, tribunal, namespace),
+      lexmlPromise,
     ])
     if (dataJudRes.length > 0 && pineconeRes.length > 0) {
       results = fuseWithRRF(dataJudRes, pineconeRes).slice(0, topK)
@@ -373,10 +408,43 @@ export async function searchHybrid(
     } else if (pineconeRes.length > 0) {
       results = pineconeRes.slice(0, topK)
     }
+    if (lexmlRes.length > 0) {
+      const seen = new Set(results.map(r => r.id))
+      for (const r of lexmlRes) {
+        if (!seen.has(r.id) && results.length < topK + 4) {
+          results.push(r)
+          seen.add(r.id)
+        }
+      }
+    }
   } else if (hasDataJud) {
-    results = await fetchDataJudResults(queryText, tribunal, topK)
+    const [dataJudRes, lexmlRes] = await Promise.all([
+      fetchDataJudResults(queryText, tribunal, topK),
+      lexmlPromise,
+    ])
+    results = [...dataJudRes]
+    const seen = new Set(results.map(r => r.id))
+    for (const r of lexmlRes) {
+      if (!seen.has(r.id) && results.length < topK + 2) {
+        results.push(r)
+        seen.add(r.id)
+      }
+    }
   } else if (hasPinecone) {
-    results = await fetchPineconeResults(queryText, topK, tribunal, namespace)
+    const [pineconeRes, lexmlRes] = await Promise.all([
+      fetchPineconeResults(queryText, topK, tribunal, namespace),
+      lexmlPromise,
+    ])
+    results = [...pineconeRes]
+    const seen = new Set(results.map(r => r.id))
+    for (const r of lexmlRes) {
+      if (!seen.has(r.id) && results.length < topK + 2) {
+        results.push(r)
+        seen.add(r.id)
+      }
+    }
+  } else {
+    results = (await lexmlPromise).slice(0, topK)
   }
 
   if (results.length > 0) {

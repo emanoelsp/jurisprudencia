@@ -13,6 +13,7 @@ import { queryPinecone } from '@/lib/pinecone'
 import {
   serializeToonForPrompt,
   validateToonIntegrity,
+  validateJustificationCitations,
 } from '@/lib/toon'
 import { aiClient, aiModels } from '@/lib/ai'
 import { isLegalScopeText, parseJustificationJson } from '@/lib/guards'
@@ -107,6 +108,10 @@ const DEFAULT_MIN_CONFIDENCE = 0.65
 const EXPANDED_SCOPE_TOP_RESULTS = 2
 const MIN_RETRIEVAL_CONFIDENCE = 0.62
 const MIN_EVIDENCE_COVERAGE = 0.45
+/** Mínimo de resultados após rerank para prosseguir com justificativas (evita ancorar em pouca evidência) */
+const MIN_RESULTS_FOR_ANALYSIS = Number(process.env.MIN_RESULTS_FOR_ANALYSIS) || 2
+/** Score mínimo no rerank para enviar resultado ao LLM (não ancorar em trechos irrelevantes) */
+const MIN_RERANK_SCORE = Number(process.env.MIN_RERANK_SCORE) || 0.5
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -385,7 +390,10 @@ export async function POST(req: NextRequest) {
 
   if (!isLegalScopeText(texto)) {
     console.warn('[analyze] out-of-scope request blocked', { reqId })
-    return new Response('Texto fora do escopo jurídico-processual.', { status: 422 })
+    return new Response(
+      'O conteúdo não parece ser uma peça processual. Envie petição, decisão ou documento jurídico.',
+      { status: 422 }
+    )
   }
 
   const stream = new ReadableStream({
@@ -586,7 +594,26 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
         const tRerank = Date.now()
         const reranked = await rerankResults(queryRag, rawResults)
         const deduped = dedupeEprocResults(reranked)
-        const withConfidence = deduped.filter(r => effectiveScore(r) >= minConfidenceScore)
+
+        if (deduped.length < MIN_RESULTS_FOR_ANALYSIS) {
+          console.warn('[analyze] too few results', { reqId, count: deduped.length, min: MIN_RESULTS_FOR_ANALYSIS })
+          send({ type: 'results', results: deduped })
+          // Ainda assim, tenta preencher abas (Bases/CP/CF) para ajudar o advogado
+          const [cfArticlesFew, basesPublicasFew, codigoPenalFew] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
+          const { cf: cfValidadosFew, cp: cpValidadosFew } = await validateLegislacaoComRag(texto, cfArticlesFew, codigoPenalFew)
+          if (cfValidadosFew.length > 0 || basesPublicasFew.length > 0 || cpValidadosFew.length > 0) {
+            send({ type: 'metadata', data: { cf_articles: cfValidadosFew, bases_publicas: basesPublicasFew, codigo_penal: cpValidadosFew, gemini_quota_exceeded: geminiQuotaExceeded } as any })
+          }
+          send({
+            type: 'error',
+            error: 'Poucos precedentes encontrados; amplie o tribunal ou o texto do processo.',
+          })
+          send({ type: 'complete', processoId })
+          return
+        }
+
+        const minScore = Math.max(minConfidenceScore, MIN_RERANK_SCORE)
+        const withConfidence = deduped.filter(r => effectiveScore(r) >= minScore)
         const topRanked = withConfidence
           .map(result => ({
             ...result,
@@ -689,15 +716,30 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
           }
           try {
             const resultStart = Date.now()
-            const systemPrompt = `Você é um especialista em direito brasileiro com profundo conhecimento em jurisprudência.
+            const numeroProcesso = result.toonData?.numeroProcesso || result.numero
+            let rawJson: string
+            let parsed: ReturnType<typeof parseJustificationJson>
+            let fullText: string
+            let violations: string[] = []
+            const maxAttempts = 2
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              const strictPrefix =
+                attempt === 2
+                  ? `REPETIÇÃO OBRIGATÓRIA - COPIE E COLE os valores exatos abaixo. Número do processo (use EXATAMENTE no JSON): ${numeroProcesso}\nRelator: ${result.relator}\nTribunal: ${result.tribunal}\nData: ${result.dataJulgamento}\n\n`
+                  : ''
+
+              const systemPrompt = `${strictPrefix}Você é um especialista em direito brasileiro com profundo conhecimento em jurisprudência. Você auxilia o advogado; a decisão final e a responsabilidade profissional são sempre do advogado.
 
 ${toonXml}
 
 REGRAS CRÍTICAS ANTI-ALUCINAÇÃO:
 1. NUNCA invente ou modifique números de processo, nomes de relatores ou tribunais.
 2. Use APENAS os valores EXATOS do bloco <IMMUTABLE_FACTS> correspondente.
-3. Ao referenciar um processo, use o número verbatim: ${result.toonData?.numeroProcesso}
-4. Saída obrigatoriamente em JSON VÁLIDO com este schema:
+3. Ao referenciar um processo, use o número verbatim: ${numeroProcesso}
+4. O campo "trecho" em cada citação deve ser citação LITERAL da ementa, sem parafrasear.
+5. Se não houver fundamento jurídico claro para citar este precedente, retorne aplicabilidade com "Relevância limitada" e seja conservador.
+6. Saída obrigatoriamente em JSON VÁLIDO com este schema:
 {
   "conclusao": "string",
   "fundamentoJuridico": "string",
@@ -712,9 +754,12 @@ REGRAS CRÍTICAS ANTI-ALUCINAÇÃO:
     }
   ]
 }
-5. Sempre incluir ao menos 1 citação no array "citacoes".`
+7. Sempre incluir ao menos 1 citação no array "citacoes".
 
-          const userPrompt = `Analise a relevância da jurisprudência #${toonResults.indexOf(result) + 1} do ${result.tribunal} (processo ${result.toonData?.numeroProcesso}) para o seguinte caso e responda APENAS no JSON exigido:
+Exemplo de justificativa conservadora (quando a aplicabilidade é limitada):
+{"conclusao":"O precedente tangencia o tema mas não trata do mesmo tipo de pedido.","fundamentoJuridico":"Tese genérica sobre prazo.","aplicabilidade":"Relevância limitada; citar apenas para contexto, não como apoio central.","citacoes":[{"numero":"...","tribunal":"STJ","relator":"Min. X","dataJulgamento":"2023-01-01","trecho":"trecho literal da ementa"}]}`
+
+              const userPrompt = `Analise a relevância da jurisprudência #${toonResults.indexOf(result) + 1} do ${result.tribunal} (processo ${numeroProcesso}) para o seguinte caso e responda APENAS no JSON exigido:
 
 CASO ANALISADO:
 ${texto.slice(0, 1500)}
@@ -722,43 +767,51 @@ ${texto.slice(0, 1500)}
 Campos esperados:
 - conclusao: síntese objetiva da relevância
 - fundamentoJuridico: tese jurídica aplicável
-- aplicabilidade: como usar na peça
-- citacoes: referências com número, tribunal, relator, data e trecho literal.
+- aplicabilidade: como usar na peça (ou "Relevância limitada" se não houver fundamento claro)
+- citacoes: referências com numero="${numeroProcesso}", tribunal="${result.tribunal}", relator e dataJulgamento EXATOS do TOON, e trecho LITERAL da ementa.
 
-Use o número do processo e o relator EXATAMENTE como fornecido no TOON.`
+Use no JSON os valores EXATOS: numero="${numeroProcesso}", relator e data como no TOON.`
 
-            const rawJson = await createCompletionWithRetry({
-              systemPrompt,
-              userPrompt,
-              reqId,
-              resultId: result.id,
-            })
+              rawJson = await createCompletionWithRetry({
+                systemPrompt,
+                userPrompt,
+                reqId,
+                resultId: result.id,
+              })
 
-            const parsed = parseJustificationJson(rawJson)
-            if (!parsed) {
-              throw new Error('Saída inválida: JSON/schema de justificativa não conforme.')
+              parsed = parseJustificationJson(rawJson)
+              if (!parsed) {
+                throw new Error('Saída inválida: JSON/schema de justificativa não conforme.')
+              }
+              fullText = [
+                `Justificativa da análise: ${parsed.conclusao}`,
+                parsed.fundamentoJuridico,
+                parsed.aplicabilidade,
+                `Citações: ${parsed.citacoes.map((c: any) => `${c.tribunal} ${c.numero} (${c.relator}, ${c.dataJulgamento})`).join('; ')}`,
+              ].join('\n\n')
+
+              const { violations: vNum } = validateToonIntegrity(fullText, toonPayloads)
+              const { violations: vCit } = validateJustificationCitations(parsed.citacoes || [], toonPayloads)
+              violations = [...vNum, ...vCit]
+              if (violations.length === 0) break
+              if (attempt === 1) {
+                console.warn('[TOON Violation] retrying with strict prompt', { resultId: result.id, violations })
+              }
             }
-            const fullText = [
-              `Justificativa da análise: ${parsed.conclusao}`,
-              parsed.fundamentoJuridico,
-              parsed.aplicabilidade,
-              `Citações: ${parsed.citacoes.map((c: any) => `${c.tribunal} ${c.numero} (${c.relator}, ${c.dataJulgamento})`).join('; ')}`,
-            ].join('\n\n')
+
             send({
               type: 'justification',
               data: { id: result.id },
-              text: fullText,
+              text: fullText!,
             })
             console.log('[analyze] step justification', {
               reqId,
               resultId: result.id,
               ms: Date.now() - resultStart,
-              chars: fullText.length,
+              chars: fullText!.length,
             })
 
-            // ─── TOON Integrity Validation ────────────────
-            const { valid, violations } = validateToonIntegrity(fullText, toonPayloads)
-            if (!valid) {
+            if (violations.length > 0) {
               console.warn('[TOON Violation]', violations)
               send({
                 type: 'error',

@@ -54,7 +54,7 @@ export interface EprocResult {
   rerankScore?: number    // cohere reranker score
   badge: ConfidenceBadge
   toonData?: ToonPayload
-  fonte?: 'datajud_cnj' | 'base_interna' | 'mock'
+  fonte?: 'datajud_cnj' | 'base_interna' | 'mock' | 'lexml' | 'stj_dados_abertos'
   alreadyUsed?: boolean
   usageCount?: number
 }

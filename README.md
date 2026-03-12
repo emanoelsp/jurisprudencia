@@ -122,11 +122,18 @@ curl -X POST http://localhost:3000/api/admin/datajud-ingest \
 ```
 5. Após ingestão, a busca da análise usa o Pinecone com metadados `fonte=datajud_cnj`.
 
-**Seed automático no primeiro run**: Ao iniciar a aplicação (`npm run dev`), a CF/88 e o Código Penal são buscados dos links oficiais do Planalto e inseridos no Pinecone (namespace `legislacao`) automaticamente. A flag `.legislacao-seeded` indica que o seed já foi executado. Para forçar o seed manualmente (ex.: em Vercel):
-```bash
-curl -X POST http://localhost:3000/api/setup/seed-legislacao
-```
-Em localhost não requer auth; em produção, configure `SETUP_SECRET` e use `Authorization: Bearer <SETUP_SECRET>`.
+**Seed automático no primeiro run (só em dev)**: Em ambiente local, ao iniciar (`npm run dev`), a CF/88 e o Código Penal são inseridos no Pinecone (namespace `legislacao`) **uma única vez** (flag `.legislacao-seeded`). No **Vercel o seed automático não roda** (evita rodar em todo cold start); você injeta **uma única vez** após o deploy e todos os clientes passam a usar o mesmo RAG.
+
+**Deploy no Vercel – injetar legislação uma vez**:
+1. Nas variáveis de ambiente do projeto Vercel, defina `SETUP_SECRET` (uma senha forte).
+2. Após o primeiro deploy, rode **uma vez** (no seu computador ou em qualquer cliente HTTP):
+   ```bash
+   curl -X POST https://SEU_APP.vercel.app/api/setup/seed-legislacao \
+     -H "Authorization: Bearer SEU_SETUP_SECRET"
+   ```
+3. Pronto. O Pinecone fica populado com CF/88 e Código Penal; todos os usuários do app usam esse mesmo RAG. Não é preciso rodar de novo para cada cliente. Se rodar o seed outra vez por engano, os mesmos IDs são sobrescritos (upsert), então não duplica dados.
+
+Em localhost o seed-legislacao não exige auth; em produção (Vercel) use sempre `Authorization: Bearer <SETUP_SECRET>`.
 
 **Ingestão manual** (reingestão via admin): Para injetar Constituição Federal e Código Penal no namespace de legislação:
 
@@ -140,6 +147,57 @@ curl -X POST http://localhost:3000/api/admin/legislacao-ingest \
 ```
 3. Parâmetros: `fonte` = `"cf"` | `"cp"` | `"ambos"` (padrão: ambos); `dryRun: true` para validar sem gravar.
 4. A busca RAG consulta o namespace de legislação quando Pinecone está configurado (ex.: DataJud vazio).
+
+### 7.1. Como rodar as ingestões (resumo)
+
+| Ingestão | O que faz | Endpoint | Auth |
+|----------|-----------|----------|------|
+| **CF/88 + Código Penal** | Planalto → Pinecone namespace `legislacao` (abas CF e CP na análise) | `POST /api/setup/seed-legislacao` ou `POST /api/admin/legislacao-ingest` | localhost livre; prod: `SETUP_SECRET` ou Firebase |
+| **DataJud (CNJ)** | Jurisprudência do tribunal escolhido → Pinecone (namespace `jurisprudencia_publica` ou `cli-<userId>`) | `POST /api/admin/datajud-ingest` | Firebase ID token |
+| **STJ Dados Abertos** | Acórdãos em lote do CKAN STJ → Pinecone | `POST /api/admin/stj-ckan-ingest` | Firebase ou `CRON_SECRET` |
+
+**LexML** não é ingestão: a busca RAG já chama o LexML em tempo real; basta `LEXML_ENABLED=true` (padrão).
+
+**Ordem sugerida:** (1) seed legislação (CF+CP), (2) datajud-ingest por tribunal, (3) opcional stj-ckan-ingest.
+
+```bash
+# 1) CF/88 e Código Penal (localhost sem auth)
+curl -X POST http://localhost:3000/api/setup/seed-legislacao
+
+# Ou reingestão (precisa estar logado no app e passar o token)
+curl -X POST http://localhost:3000/api/admin/legislacao-ingest \
+  -H "Authorization: Bearer <firebase_id_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"fonte":"ambos"}'
+
+# 2) DataJud – jurisprudência de um tribunal (ex.: TJSP)
+curl -X POST http://localhost:3000/api/admin/datajud-ingest \
+  -H "Authorization: Bearer <firebase_id_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"tribunalSigla":"TJSP","size":30,"dryRun":false}'
+
+# 3) STJ Dados Abertos (cron ou manual com CRON_SECRET)
+curl -X POST http://localhost:3000/api/admin/stj-ckan-ingest \
+  -H "Authorization: Bearer SEU_CRON_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"maxDocs":40,"maxResources":2}'
+```
+
+Para obter o Firebase ID token: faça login no app, abra DevTools → Application (ou Console) e use o token que o Firebase Auth fornece (ex.: `currentUser.getIdToken()` no console).
+
+### 8. LexML e STJ Dados Abertos (bases complementares)
+
+**LexML** – legislação, normas e jurisprudência. Integrado ao RAG: a busca híbrida inclui resultados do LexML automaticamente.
+- API SRU: `https://www.lexml.gov.br/busca/SRU`
+- Opcional: `LEXML_ENABLED=false` desativa; `LEXML_SRU_BASE` para URL customizada.
+
+**STJ Dados Abertos** – ingest automatizado no Pinecone (RAG passa a retornar também STJ).
+- **Automatizar ingest**: `POST /api/admin/stj-ckan-ingest` lista recursos no CKAN, baixa JSON e faz upsert no Pinecone. Requer auth (Firebase) ou `Authorization: Bearer CRON_SECRET` (defina `CRON_SECRET` no `.env.local`).
+- Body opcional: `{ "dryRun": true, "maxDocs": 40, "maxResources": 2 }`. Se a API CKAN retornar 403, envie `resourceUrl` com um link direto para um JSON baixado do portal.
+- **Cron**: use `scripts/stj-ckan-ingest-cron.sh` ou chame a API com `CRON_SECRET` (ex.: semanal).
+- Listar recursos: `GET /api/admin/stj-recursos`. Para busca em tempo real do STJ, use DataJud (tribunal STJ).
+
+**STJD (Justiça Desportiva)** – não há API pública de dados abertos. Jurisprudência disponível no [portal do STJD](https://www.stjd.org.br/jurisprudencia/acordaos-decisoes) para consulta manual.
 
 Observações:
 - Use `dryRun: true` para validar sem gravar vetores.
