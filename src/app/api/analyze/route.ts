@@ -601,9 +601,7 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
           // Ainda assim, tenta preencher abas (Bases/CP/CF) para ajudar o advogado
           const [cfArticlesFew, basesPublicasFew, codigoPenalFew] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
           const { cf: cfValidadosFew, cp: cpValidadosFew } = await validateLegislacaoComRag(texto, cfArticlesFew, codigoPenalFew)
-          if (cfValidadosFew.length > 0 || basesPublicasFew.length > 0 || cpValidadosFew.length > 0) {
-            send({ type: 'metadata', data: { cf_articles: cfValidadosFew, bases_publicas: basesPublicasFew, codigo_penal: cpValidadosFew, gemini_quota_exceeded: geminiQuotaExceeded } as any })
-          }
+          send({ type: 'metadata', data: { cf_articles: cfValidadosFew, bases_publicas: basesPublicasFew, codigo_penal: cpValidadosFew, gemini_quota_exceeded: geminiQuotaExceeded } as any })
           send({
             type: 'error',
             error: 'Poucos precedentes encontrados; amplie o tribunal ou o texto do processo.',
@@ -652,9 +650,7 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
           send({ type: 'results', results: [] })
           const [cfArticlesEarly, basesPublicasEarly, codigoPenalEarly] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
           const { cf: cfValidadosEarly, cp: cpValidadosEarly } = await validateLegislacaoComRag(texto, cfArticlesEarly, codigoPenalEarly)
-          if (cfValidadosEarly.length > 0 || basesPublicasEarly.length > 0 || cpValidadosEarly.length > 0) {
-            send({ type: 'metadata', data: { cf_articles: cfValidadosEarly, bases_publicas: basesPublicasEarly, codigo_penal: cpValidadosEarly, gemini_quota_exceeded: geminiQuotaExceeded } as any })
-          }
+          send({ type: 'metadata', data: { cf_articles: cfValidadosEarly, bases_publicas: basesPublicasEarly, codigo_penal: cpValidadosEarly, gemini_quota_exceeded: geminiQuotaExceeded } as any })
           send({
             type: 'error',
             error: shouldExpandScope
@@ -674,9 +670,7 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
           send({ type: 'results', results: topRanked })
           const [cfArticlesAbstain, basesPublicasAbstain, codigoPenalAbstain] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
           const { cf: cfValidadosAbstain, cp: cpValidadosAbstain } = await validateLegislacaoComRag(texto, cfArticlesAbstain, codigoPenalAbstain)
-          if (cfValidadosAbstain.length > 0 || basesPublicasAbstain.length > 0 || cpValidadosAbstain.length > 0) {
-            send({ type: 'metadata', data: { cf_articles: cfValidadosAbstain, bases_publicas: basesPublicasAbstain, codigo_penal: cpValidadosAbstain, gemini_quota_exceeded: geminiQuotaExceeded } as any })
-          }
+          send({ type: 'metadata', data: { cf_articles: cfValidadosAbstain, bases_publicas: basesPublicasAbstain, codigo_penal: cpValidadosAbstain, gemini_quota_exceeded: geminiQuotaExceeded } as any })
           send({ type: 'error', error: buildAbstainMessage({ retrievalConfidence, evidenceCoverage }) })
           send({ type: 'complete', processoId })
           return

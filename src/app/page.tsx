@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import Logo from '@/components/ui/Logo'
 import { Eye, EyeOff, ArrowRight, Scale, Shield, BookOpen, BarChart3, ChevronRight } from 'lucide-react'
+import { sendPasswordResetEmail } from 'firebase/auth'
 import toast from 'react-hot-toast'
 import type { PlanId } from '@/lib/plans'
 
@@ -29,6 +30,8 @@ export default function HomePage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('free')
   const [submitting, setSubmitting] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [showReset, setShowReset] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => {
@@ -51,6 +54,20 @@ export default function HomePage() {
               toast.error(err.message || 'Erro na autenticação.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handlePasswordReset() {
+    const emailToReset = resetEmail || email
+    if (!emailToReset) { toast.error('Informe o email para redefinir a senha.'); return }
+    try {
+      const { getAuth } = await import('firebase/auth')
+      const auth = getAuth()
+      await sendPasswordResetEmail(auth, emailToReset)
+      toast.success('Email de redefinição enviado! Verifique sua caixa de entrada.')
+      setShowReset(false)
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao enviar email de redefinição.')
     }
   }
 
@@ -301,10 +318,26 @@ export default function HomePage() {
               </div>
 
               {mode === 'login' && (
-                <div className="flex justify-end">
-                  <button type="button" className="font-body text-brand-slate text-xs hover:text-brand-gold transition-colors">
-                    Esqueceu a senha?
-                  </button>
+                <div>
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => setShowReset(true)} className="font-body text-brand-slate text-xs hover:text-brand-gold transition-colors">
+                      Esqueceu a senha?
+                    </button>
+                  </div>
+                  {showReset && (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        type="email"
+                        value={resetEmail}
+                        onChange={e => setResetEmail(e.target.value)}
+                        placeholder="Seu email cadastrado"
+                        className="input w-full text-sm"
+                      />
+                      <button onClick={handlePasswordReset} type="button" className="btn-primary w-full text-sm py-2">
+                        Enviar link de redefinição
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

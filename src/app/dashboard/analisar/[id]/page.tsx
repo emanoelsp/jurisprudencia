@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context'
 import { normalizePlan } from '@/lib/plans'
 import type { Processo, EprocResult, AnalysisChunk, JurisprudenciaCriada } from '@/types'
 import EprocResultCard from '@/components/features/EprocResultCard'
+import { SkeletonList, SkeletonLine } from '@/components/ui/Skeleton'
 import {
   Sparkles, Save, CheckCircle, AlertCircle,
   ArrowLeft, FileText, Loader2, Cpu,
@@ -70,6 +71,7 @@ export default function AnalisarPage() {
   const [agentSteps, setAgentSteps] = useState<Array<{ label: string; done: boolean }>>([])
   const abortRef = useRef<AbortController | null>(null)
   const [mobilePanel, setMobilePanel] = useState<'results' | 'editor'>('results')
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
 
   const INITIAL_AGENT_STEPS: Array<{ label: string; done: boolean }> = [
     { label: 'Analisei o texto do seu processo para entender o tema e os pedidos.', done: false },
@@ -114,14 +116,20 @@ export default function AnalisarPage() {
   }, [tribunalDropdownOpen])
 
   async function loadProcesso() {
-    const snap = await getDoc(doc(db, 'processos', id))
-    if (!snap.exists()) { router.push('/dashboard/processos'); return }
-    const p = { id: snap.id, ...snap.data() } as Processo
-    setProcesso(p)
-    setEditorContent(p.teseFinal || '')
-    const tribunalDefault = (p.tribunal || 'TODOS').toUpperCase()
-    setSelectedTribunal(TRIBUNAL_OPTIONS.includes(tribunalDefault) ? tribunalDefault : 'TODOS')
-    setLoading(false)
+    try {
+      const snap = await getDoc(doc(db, 'processos', id))
+      if (!snap.exists()) { router.push('/dashboard/processos'); return }
+      const p = { id: snap.id, ...snap.data() } as Processo
+      setProcesso(p)
+      setEditorContent(p.teseFinal || '')
+      const tribunalDefault = (p.tribunal || 'TODOS').toUpperCase()
+      setSelectedTribunal(TRIBUNAL_OPTIONS.includes(tribunalDefault) ? tribunalDefault : 'TODOS')
+      setLoading(false)
+    } catch (err) {
+      console.error('[loadProcesso] failed', err)
+      toast.error('Erro ao carregar processo.')
+      router.push('/dashboard/processos')
+    }
   }
 
   async function getAuthHeaders() {
@@ -138,6 +146,7 @@ export default function AnalisarPage() {
     }
 
     setAnalyzing(true)
+    setAnalysisError(null)
     setResults([])
     setJustificativas({})
     setCfArticlesFromAnalysis([])
@@ -278,6 +287,7 @@ export default function AnalisarPage() {
         if (chunk.error && (chunk.error.includes('TOON') || chunk.error.includes('Violação TOON'))) {
           setToonValid(false)
         }
+        setAnalysisError(chunk.error || 'Erro desconhecido')
         toast.error(chunk.error || 'Erro desconhecido.')
         break
     }
@@ -358,8 +368,27 @@ export default function AnalisarPage() {
   }
 
   if (loading) return (
-    <div className="flex items-center justify-center h-full p-12">
-      <Loader2 className="text-brand-indigo animate-spin" size={32} />
+    <div className="flex flex-col h-[calc(100vh-56px)] lg:h-screen overflow-hidden">
+      <div className="flex items-center gap-4 px-6 py-3 bg-brand-navylt border-b border-brand-border">
+        <SkeletonLine className="w-8 h-8 rounded-md" />
+        <div className="flex-1 space-y-2">
+          <SkeletonLine className="w-1/3 h-4" />
+          <SkeletonLine className="w-1/2 h-3" />
+        </div>
+        <SkeletonLine className="w-28 h-8 rounded-md" />
+      </div>
+      <div className="flex flex-1 overflow-hidden">
+        <div className="w-full lg:w-[45%] border-r border-brand-border p-4 space-y-3">
+          <SkeletonLine className="w-40 h-4" />
+          <SkeletonList count={3} />
+        </div>
+        <div className="hidden lg:flex flex-1 flex-col p-6 space-y-4">
+          <SkeletonLine className="w-48 h-4" />
+          <SkeletonLine className="w-full h-3" />
+          <SkeletonLine className="w-3/4 h-3" />
+          <SkeletonLine className="w-full h-64 rounded-lg" />
+        </div>
+      </div>
     </div>
   )
 
@@ -757,6 +786,15 @@ export default function AnalisarPage() {
                   </div>
                 )}
 
+                {analysisError && !analyzing && (
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 space-y-2">
+                    <p className="font-body text-red-300 text-sm">{analysisError}</p>
+                    <button onClick={() => startAnalysis()} className="btn-primary text-xs py-1.5 px-3">
+                      Tentar novamente
+                    </button>
+                  </div>
+                )}
+
                 {results.map((result, i) => (
                   <EprocResultCard
                     key={result.id}
@@ -816,6 +854,9 @@ export default function AnalisarPage() {
                             <a href="https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-indigo hover:underline">CF/88</a>
                             <a href="https://www2.senado.leg.br/bdsf/bitstream/handle/id/608973/Codigo_penal_6ed.pdf?sequence=1&isAllowed=y" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-indigo hover:underline">Código Penal</a>
                           </div>
+                          <button onClick={() => startAnalysis()} disabled={analyzing} className="btn-primary text-xs py-1.5 px-3 mt-2">
+                            {analyzing ? 'Analisando...' : 'Analisar agora'}
+                          </button>
                         </>
                       )}
                     </div>
@@ -867,6 +908,9 @@ export default function AnalisarPage() {
                             Execute a análise para que a IA identifique os artigos do CP aplicáveis ao processo.
                           </p>
                           <a href="https://www2.senado.leg.br/bdsf/bitstream/handle/id/608973/Codigo_penal_6ed.pdf?sequence=1&isAllowed=y" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-indigo hover:underline mt-2 inline-block">Código Penal (Senado)</a>
+                          <button onClick={() => startAnalysis()} disabled={analyzing} className="btn-primary text-xs py-1.5 px-3 mt-2">
+                            {analyzing ? 'Analisando...' : 'Analisar agora'}
+                          </button>
                         </>
                       )}
                     </div>
@@ -915,6 +959,9 @@ export default function AnalisarPage() {
                             Execute a análise para que a IA identifique, com base no processo e na Constituição (Planalto), quais artigos se enquadram.
                           </p>
                           <a href="https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm" target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-gold hover:underline mt-2 inline-block">Constituição Federal (Planalto)</a>
+                          <button onClick={() => startAnalysis()} disabled={analyzing} className="btn-primary text-xs py-1.5 px-3 mt-2">
+                            {analyzing ? 'Analisando...' : 'Analisar agora'}
+                          </button>
                         </>
                       )}
                     </div>

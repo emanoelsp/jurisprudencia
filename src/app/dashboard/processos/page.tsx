@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import Link from 'next/link'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -268,6 +269,16 @@ export default function ProcessosPage() {
     p.natureza?.toLowerCase().includes(search.toLowerCase())
   )
 
+  if (loading) return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="h-6 w-40 bg-brand-border/60 rounded animate-pulse" />
+        <div className="h-9 w-32 bg-brand-border/60 rounded animate-pulse" />
+      </div>
+      <SkeletonTable rows={5} />
+    </div>
+  )
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 animate-fade-in">
 
@@ -299,11 +310,7 @@ export default function ProcessosPage() {
 
       {/* List */}
       <div className="card overflow-hidden">
-        {loading ? (
-          <div className="p-12 flex justify-center">
-            <Loader2 size={24} className="text-brand-indigo animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="p-8 sm:p-12 text-center space-y-3">
             <FileText size={40} className="text-brand-border mx-auto" />
             <p className="font-body text-brand-slate text-sm">
@@ -347,7 +354,7 @@ export default function ProcessosPage() {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-1 justify-end">
-                          <Link href={`/dashboard/analisar/${p.id}`} className="btn-ghost py-1 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Link href={`/dashboard/analisar/${p.id}`} className="btn-ghost py-1 px-2 text-xs">
                             Analisar <ArrowRight size={12} />
                           </Link>
                           {p.status === 'approved' && (p.storageUrl || p.storagePath) ? (

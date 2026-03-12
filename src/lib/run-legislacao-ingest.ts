@@ -51,12 +51,13 @@ export async function runLegislacaoIngest(
     if (fonte === 'cf' || fonte === 'ambos') {
       let arts = await fetchCfPlanalto()
       if (arts.length < 5) {
+        console.warn('[legislacao-ingest] CF/88: Planalto retornou poucos artigos, usando fallback')
         arts = [...arts, ...ARTIGOS_CONSTITUCIONAIS.map(a => ({ id: a.id, titulo: a.titulo, texto: a.texto }))]
       }
-      console.log('[legislacao-ingest] CF/88: fetched', arts.length, 'articles from Planalto')
+      console.log('[legislacao-ingest] CF/88: fetched', arts.length, 'articles')
       for (const a of arts) {
         const texto = `[${a.titulo}]\n${a.texto}`
-        const chunks = chunkText(texto, chunkSize, overlap).slice(0, 3)
+        const chunks = chunkText(texto, chunkSize, overlap).slice(0, 6)
         for (let i = 0; i < chunks.length; i++) {
           const embedding = await generateEmbedding(chunks[i])
           vectors.push({
@@ -80,11 +81,14 @@ export async function runLegislacaoIngest(
 
     if (fonte === 'cp' || fonte === 'ambos') {
       let cpArts = await fetchCodigoPenalPlanalto()
-      if (cpArts.length < 5) cpArts = ARTIGOS_PENAIS
-      console.log('[legislacao-ingest] CP: fetched', cpArts.length, 'articles from Planalto')
+      if (cpArts.length < 5) {
+        console.warn('[legislacao-ingest] CP: Planalto retornou poucos artigos, usando fallback')
+        cpArts = ARTIGOS_PENAIS
+      }
+      console.log('[legislacao-ingest] CP: fetched', cpArts.length, 'articles')
       for (const a of cpArts) {
         const texto = `[${a.titulo}]\n${a.texto}`
-        const chunks = chunkText(texto, chunkSize, overlap).slice(0, 3)
+        const chunks = chunkText(texto, chunkSize, overlap).slice(0, 6)
         for (let i = 0; i < chunks.length; i++) {
           const embedding = await generateEmbedding(chunks[i])
           vectors.push({

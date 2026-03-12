@@ -8,7 +8,7 @@ import { normalizePlan, planForUserPlan, todayDateKey } from '@/lib/plans'
 import Logo from '@/components/ui/Logo'
 import {
   LayoutDashboard, FileText, BookOpen,
-  LogOut, Settings, ChevronRight, Crown, WalletCards,
+  LogOut, ChevronRight, Crown, WalletCards,
   Menu, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -157,10 +157,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <div className="flex gap-1.5">
-          <button className="btn-ghost flex-1 text-xs py-2 px-2 justify-center">
-            <Settings size={14} />
-            <span className="hidden sm:inline">Config</span>
-          </button>
           <button onClick={handleSignOut} className="btn-ghost flex-1 text-xs py-2 px-2 justify-center">
             <LogOut size={14} />
             <span className="hidden sm:inline">Sair</span>

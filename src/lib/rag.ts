@@ -395,53 +395,40 @@ export async function searchHybrid(
   const lexmlPromise = fetchLexMLResults(queryText, 4)
 
   if (hasDataJud && hasPinecone) {
-    // Híbrido: DataJud + Pinecone em paralelo → RRF
     const [dataJudRes, pineconeRes, lexmlRes] = await Promise.all([
       fetchDataJudResults(queryText, tribunal, topK + 4),
       fetchPineconeResults(queryText, topK + 4, tribunal, namespace),
       lexmlPromise,
     ])
-    if (dataJudRes.length > 0 && pineconeRes.length > 0) {
-      results = fuseWithRRF(dataJudRes, pineconeRes).slice(0, topK)
-    } else if (dataJudRes.length > 0) {
-      results = dataJudRes.slice(0, topK)
-    } else if (pineconeRes.length > 0) {
-      results = pineconeRes.slice(0, topK)
-    }
-    if (lexmlRes.length > 0) {
-      const seen = new Set(results.map(r => r.id))
-      for (const r of lexmlRes) {
-        if (!seen.has(r.id) && results.length < topK + 4) {
-          results.push(r)
-          seen.add(r.id)
-        }
+    const allLists = [dataJudRes, pineconeRes, lexmlRes].filter(l => l.length > 0)
+    if (allLists.length >= 2) {
+      let fused = fuseWithRRF(allLists[0], allLists[1])
+      for (let i = 2; i < allLists.length; i++) {
+        fused = fuseWithRRF(fused, allLists[i])
       }
+      results = fused.slice(0, topK)
+    } else if (allLists.length === 1) {
+      results = allLists[0].slice(0, topK)
     }
   } else if (hasDataJud) {
     const [dataJudRes, lexmlRes] = await Promise.all([
       fetchDataJudResults(queryText, tribunal, topK),
       lexmlPromise,
     ])
-    results = [...dataJudRes]
-    const seen = new Set(results.map(r => r.id))
-    for (const r of lexmlRes) {
-      if (!seen.has(r.id) && results.length < topK + 2) {
-        results.push(r)
-        seen.add(r.id)
-      }
+    if (dataJudRes.length > 0 && lexmlRes.length > 0) {
+      results = fuseWithRRF(dataJudRes, lexmlRes).slice(0, topK)
+    } else {
+      results = (dataJudRes.length > 0 ? dataJudRes : lexmlRes).slice(0, topK)
     }
   } else if (hasPinecone) {
     const [pineconeRes, lexmlRes] = await Promise.all([
       fetchPineconeResults(queryText, topK, tribunal, namespace),
       lexmlPromise,
     ])
-    results = [...pineconeRes]
-    const seen = new Set(results.map(r => r.id))
-    for (const r of lexmlRes) {
-      if (!seen.has(r.id) && results.length < topK + 2) {
-        results.push(r)
-        seen.add(r.id)
-      }
+    if (pineconeRes.length > 0 && lexmlRes.length > 0) {
+      results = fuseWithRRF(pineconeRes, lexmlRes).slice(0, topK)
+    } else {
+      results = (pineconeRes.length > 0 ? pineconeRes : lexmlRes).slice(0, topK)
     }
   } else {
     results = (await lexmlPromise).slice(0, topK)

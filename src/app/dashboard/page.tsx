@@ -8,6 +8,7 @@ import Link from 'next/link'
 import type { Processo } from '@/types'
 import { statusLabel, statusColor, formatDate, truncate } from '@/lib/utils'
 import { FileText, TrendingUp, CheckCircle, Clock, Plus, ArrowRight } from 'lucide-react'
+import { SkeletonStats, SkeletonList } from '@/components/ui/Skeleton'
 
 export default function DashboardPage() {
   const { user, userData } = useAuth()
@@ -45,6 +46,17 @@ export default function DashboardPage() {
   const hora = new Date().getHours()
   const greeting = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
 
+  if (loading) return (
+    <div className="p-6 space-y-6">
+      <div className="space-y-1">
+        <div className="h-6 w-48 bg-brand-border/60 rounded animate-pulse" />
+        <div className="h-4 w-32 bg-brand-border/40 rounded animate-pulse" />
+      </div>
+      <SkeletonStats />
+      <SkeletonList count={3} />
+    </div>
+  )
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6 lg:space-y-8 animate-fade-in">
 
@@ -78,7 +90,7 @@ export default function DashboardPage() {
           <div key={label} className="card p-4 sm:p-5 space-y-3">
             <div className="flex items-center justify-between">
               <Icon size={18} className={color} />
-              <span className={`font-display font-bold text-2xl sm:text-3xl ${color}`}>{loading ? '...' : value}</span>
+              <span className={`font-display font-bold text-2xl sm:text-3xl ${color}`}>{value}</span>
             </div>
             <p className="font-body text-brand-slate text-[11px] sm:text-xs font-medium">{label}</p>
           </div>
@@ -94,16 +106,26 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {loading ? (
-          <div className="p-8 flex justify-center">
-            <div className="w-6 h-6 border-2 border-brand-indigo border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : processos.length === 0 ? (
+        {processos.length === 0 ? (
           <div className="p-8 sm:p-12 text-center space-y-3">
             <FileText size={36} className="text-brand-border mx-auto" />
             <p className="font-body text-brand-slate text-sm">
             Nenhum processo ainda. Que tal começar?
             </p>
+            <div className="text-left space-y-3 mt-4 mb-4">
+              <div className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-brand-indigo/20 text-brand-indigo text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
+                <p className="font-body text-brand-slate text-sm">Crie um processo e faça upload do PDF da peça</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-brand-indigo/20 text-brand-indigo text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
+                <p className="font-body text-brand-slate text-sm">Clique em &quot;Analisar com JurisprudencIA&quot; para buscar jurisprudências</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-brand-indigo/20 text-brand-indigo text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
+                <p className="font-body text-brand-slate text-sm">Revise as sugestões, insira no editor e aprove</p>
+              </div>
+            </div>
             <Link href="/dashboard/processos" className="btn-primary inline-flex">
               <Plus size={14} />
               Adicionar primeiro processo

@@ -179,6 +179,7 @@ export async function fetchDataJudByQuery(params: {
         const docs = hits
           .map((hit: any, i: number) => normalizeDataJudDoc(hit?._source || hit, i, tribunalAlias))
           .filter((d: DataJudProcesso | null): d is DataJudProcesso => !!d)
+          .filter((d: DataJudProcesso) => !d.ementa.startsWith('Ementa não disponível'))
         if (docs.length > 0) return docs
       } else {
         console.warn('[datajud] query failed', response.status, await response.text().catch(() => ''))
