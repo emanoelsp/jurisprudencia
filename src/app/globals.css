@@ -164,6 +164,13 @@ html { scroll-behavior: smooth; }
     linear-gradient(120deg, rgba(248,245,239,0.03) 0%, rgba(248,245,239,0) 40%);
 }
 
+/* ─── Auth Panel polish ────────────────────────────── */
+.auth-panel-glow {
+  box-shadow:
+    inset 1px 0 0 rgba(201,169,78,0.08),
+    inset 0 1px 0 rgba(201,169,78,0.05);
+}
+
 .legal-signal-panel {
   border: 1px solid rgba(201,169,78,0.2);
   border-radius: 14px;
@@ -282,4 +289,24 @@ html { scroll-behavior: smooth; }
 }
 .glow-gold {
   box-shadow: 0 0 40px rgba(201,169,78,0.2), 0 0 80px rgba(201,169,78,0.08);
+}
+
+/* ─── Mobile Improvements ──────────────────────────── */
+@media (max-width: 1023px) {
+  .bg-grid {
+    background-size: 24px 24px;
+  }
+}
+
+/* Touch-friendly scrolling */
+.overflow-y-auto,
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe area padding for mobile */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

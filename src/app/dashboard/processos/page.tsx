@@ -126,7 +126,6 @@ export default function ProcessosPage() {
       let storageUrl = ''
       let storagePath = ''
 
-      // Upload PDF (pula se SKIP_FIREBASE_STORAGE=true ou Storage indisponível)
       const skipStorage = process.env.NEXT_PUBLIC_SKIP_FIREBASE_STORAGE === 'true'
       if (pdfFile && !skipStorage) {
         const tUpload = performance.now()
@@ -223,7 +222,7 @@ export default function ProcessosPage() {
       window.URL.revokeObjectURL(objectUrl)
     } catch (err) {
       console.error('[processo-download] failed', err)
-      toast.error('Não foi possível baixar o PDF.')
+      toast.error('Nao foi possivel baixar o PDF.')
     }
   }
 
@@ -253,7 +252,7 @@ export default function ProcessosPage() {
         throw new Error(err.error || 'Erro ao excluir processo')
       }
       setProcessos(prev => prev.filter(p => p.id !== deleteTarget.id))
-      toast.success('Processo excluído com sucesso.')
+      toast.success('Processo excluido com sucesso.')
       closeDeleteDialog()
     } catch (err: any) {
       console.error('[processo-delete] failed', err)
@@ -270,17 +269,17 @@ export default function ProcessosPage() {
   )
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 animate-fade-in">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="section-title">Processos</h1>
+          <h1 className="section-title text-xl sm:text-2xl">Processos</h1>
           <p className="font-body text-brand-slate text-sm mt-1">
             {processos.length} processo{processos.length !== 1 ? 's' : ''} cadastrado{processos.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary">
+        <button onClick={() => setShowModal(true)} className="btn-primary self-start sm:self-auto">
           <Plus size={16} />
           Novo Processo
         </button>
@@ -293,7 +292,7 @@ export default function ProcessosPage() {
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por número, cliente ou natureza…"
+          placeholder="Buscar por numero, cliente ou natureza..."
           className="input pl-11"
         />
       </div>
@@ -305,50 +304,52 @@ export default function ProcessosPage() {
             <Loader2 size={24} className="text-brand-indigo animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-12 text-center space-y-3">
+          <div className="p-8 sm:p-12 text-center space-y-3">
             <FileText size={40} className="text-brand-border mx-auto" />
             <p className="font-body text-brand-slate text-sm">
               {search ? 'Nenhum processo encontrado.' : 'Nenhum processo cadastrado ainda.'}
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-brand-border">
-                  {['Número CNJ', 'Cliente', 'Natureza', 'Status', 'Data', ''].map(h => (
-                    <th key={h} className="px-5 py-3 text-left font-body text-xs font-semibold text-brand-slate uppercase tracking-wider">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-border">
-                {filtered.map(p => (
-                  <tr key={p.id} className="hover:bg-brand-navy/40 transition-colors group">
-                    <td className="px-5 py-4">
-                      <span className="font-mono text-xs text-brand-cream">{p.numero || '—'}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="font-body text-sm text-brand-cream font-medium">{p.cliente}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="font-body text-xs text-brand-slate">{p.natureza || '—'}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`status-dot ${statusColor(p.status)}`} />
-                        <span className="font-body text-xs text-brand-slate">{statusLabel(p.status)}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="font-body text-xs text-brand-slate">{formatDate(p.createdAt)}</span>
-                    </td>
-	                    <td className="px-5 py-4">
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-brand-border">
+                    {['Numero CNJ', 'Cliente', 'Natureza', 'Status', 'Data', ''].map(h => (
+                      <th key={h} className="px-5 py-3 text-left font-body text-xs font-semibold text-brand-slate uppercase tracking-wider">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-border">
+                  {filtered.map(p => (
+                    <tr key={p.id} className="hover:bg-brand-navy/40 transition-colors group">
+                      <td className="px-5 py-4">
+                        <span className="font-mono text-xs text-brand-cream">{p.numero || '--'}</span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="font-body text-sm text-brand-cream font-medium">{p.cliente}</span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="font-body text-xs text-brand-slate">{p.natureza || '--'}</span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`status-dot ${statusColor(p.status)}`} />
+                          <span className="font-body text-xs text-brand-slate">{statusLabel(p.status)}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="font-body text-xs text-brand-slate">{formatDate(p.createdAt)}</span>
+                      </td>
+                      <td className="px-5 py-4">
                         <div className="flex items-center gap-1 justify-end">
-	                        <Link href={`/dashboard/analisar/${p.id}`} className="btn-ghost py-1 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-	                          Analisar <ArrowRight size={12} />
-	                        </Link>
+                          <Link href={`/dashboard/analisar/${p.id}`} className="btn-ghost py-1 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                            Analisar <ArrowRight size={12} />
+                          </Link>
                           {p.status === 'approved' && (p.storageUrl || p.storagePath) ? (
                             <button
                               onClick={() => handleDownloadProcess(p)}
@@ -360,7 +361,7 @@ export default function ProcessosPage() {
                           ) : (
                             <span
                               className="btn-ghost py-1 px-2 text-xs opacity-40 cursor-not-allowed"
-                              title="Download disponível apenas para processos aprovados"
+                              title="Download disponivel apenas para processos aprovados"
                             >
                               <Download size={12} />
                             </span>
@@ -373,24 +374,68 @@ export default function ProcessosPage() {
                             <Trash2 size={12} />
                           </button>
                         </div>
-		                    </td>
-		                  </tr>
-	                ))}
-              </tbody>
-            </table>
-          </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y divide-brand-border">
+              {filtered.map(p => (
+                <div key={p.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-body text-sm font-semibold text-brand-cream truncate">{p.cliente}</p>
+                      <p className="font-mono text-[11px] text-brand-slate mt-0.5 truncate">{p.numero || '--'}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className={`status-dot ${statusColor(p.status)}`} />
+                      <span className="font-body text-[11px] text-brand-slate">{statusLabel(p.status)}</span>
+                    </div>
+                  </div>
+                  {p.natureza && (
+                    <p className="font-body text-xs text-brand-slate truncate">{p.natureza}</p>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="font-body text-[11px] text-brand-slate">{formatDate(p.createdAt)}</span>
+                    <div className="flex items-center gap-1">
+                      <Link href={`/dashboard/analisar/${p.id}`} className="btn-ghost py-1.5 px-2 text-xs">
+                        Analisar <ArrowRight size={12} />
+                      </Link>
+                      {p.status === 'approved' && (p.storageUrl || p.storagePath) && (
+                        <button
+                          onClick={() => handleDownloadProcess(p)}
+                          className="btn-ghost py-1.5 px-2 text-xs"
+                        >
+                          <Download size={12} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => openDeleteDialog(p)}
+                        className="btn-ghost py-1.5 px-2 text-xs text-red-300"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
       {/* Modal: Upload + Auto-fill */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-float">
-            <div className="flex items-center justify-between p-6 border-b border-brand-border">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="card w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-float rounded-t-2xl sm:rounded-xl">
+            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-brand-border sticky top-0 bg-brand-navylt z-10">
               <div>
-                <h2 className="font-display font-bold text-brand-cream text-xl">Novo Processo</h2>
-                <p className="font-body text-brand-slate text-sm mt-0.5">
-                  Faça upload do PDF e a IA preencherá os metadados automaticamente.
+                <h2 className="font-display font-bold text-brand-cream text-lg sm:text-xl">Novo Processo</h2>
+                <p className="font-body text-brand-slate text-xs sm:text-sm mt-0.5">
+                  Faca upload do PDF e a IA preenchera os metadados automaticamente.
                 </p>
               </div>
               <button onClick={() => { setShowModal(false); setForm(emptyForm); setPdfFile(null) }} className="btn-ghost p-2">
@@ -398,12 +443,12 @@ export default function ProcessosPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-5 sm:p-6 space-y-5 sm:space-y-6">
               {/* Dropzone */}
               <div
                 {...getRootProps()}
                 className={cn(
-                  'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200',
+                  'border-2 border-dashed rounded-xl p-6 sm:p-8 text-center cursor-pointer transition-all duration-200',
                   isDragActive
                     ? 'border-brand-indigo bg-brand-indigo/10'
                     : pdfFile
@@ -416,7 +461,7 @@ export default function ProcessosPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-center gap-2 text-brand-indigo">
                       <Sparkles size={20} className="animate-pulse" />
-                      <span className="font-body text-sm font-semibold">IA extraindo metadados…</span>
+                      <span className="font-body text-sm font-semibold">IA extraindo metadados...</span>
                     </div>
                     <p className="font-body text-brand-slate text-xs">Aguarde, lendo o documento</p>
                   </div>
@@ -432,47 +477,47 @@ export default function ProcessosPage() {
                     <p className="font-body font-semibold text-brand-cream text-sm">
                       Arraste o PDF ou clique para selecionar
                     </p>
-                    <p className="font-body text-brand-slate text-xs">A IA preencherá número, cliente e natureza automaticamente</p>
+                    <p className="font-body text-brand-slate text-xs">A IA preenchera numero, cliente e natureza automaticamente</p>
                   </div>
                 )}
               </div>
 
               {/* Form */}
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="label">Número CNJ *</label>
-                    <input
-                      value={form.numero}
-                      onChange={e => setForm(f => ({ ...f, numero: e.target.value }))}
-                      placeholder="0000000-00.0000.0.00.0000"
-                      className="input font-mono"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="label">Cliente / Parte Autora *</label>
-                    <input
-                      value={form.cliente}
-                      onChange={e => setForm(f => ({ ...f, cliente: e.target.value }))}
-                      placeholder="Nome completo do cliente"
-                      className="input"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="label">Natureza da Ação</label>
-                    <input
-                      value={form.natureza}
-                      onChange={e => setForm(f => ({ ...f, natureza: e.target.value }))}
-                      placeholder="Ex: Ação de Indenização por Danos Morais"
-                      className="input"
-                    />
-                  </div>
+                <div>
+                  <label className="label">Numero CNJ *</label>
+                  <input
+                    value={form.numero}
+                    onChange={e => setForm(f => ({ ...f, numero: e.target.value }))}
+                    placeholder="0000000-00.0000.0.00.0000"
+                    className="input font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="label">Cliente / Parte Autora *</label>
+                  <input
+                    value={form.cliente}
+                    onChange={e => setForm(f => ({ ...f, cliente: e.target.value }))}
+                    placeholder="Nome completo do cliente"
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Natureza da Acao</label>
+                  <input
+                    value={form.natureza}
+                    onChange={e => setForm(f => ({ ...f, natureza: e.target.value }))}
+                    placeholder="Ex: Acao de Indenizacao por Danos Morais"
+                    className="input"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="label">Vara / Câmara</label>
+                    <label className="label">Vara / Camara</label>
                     <input
                       value={form.vara}
                       onChange={e => setForm(f => ({ ...f, vara: e.target.value }))}
-                      placeholder="Ex: 3ª Vara Cível"
+                      placeholder="Ex: 3a Vara Civel"
                       className="input"
                     />
                   </div>
@@ -485,25 +530,25 @@ export default function ProcessosPage() {
                       className="input"
                     />
                   </div>
-                  <div>
-                    <label className="label">Data de Protocolo</label>
-                    <input
-                      type="date"
-                      value={form.dataProtocolo}
-                      onChange={e => setForm(f => ({ ...f, dataProtocolo: e.target.value }))}
-                      className="input"
-                    />
-                  </div>
+                </div>
+                <div className="sm:w-1/2">
+                  <label className="label">Data de Protocolo</label>
+                  <input
+                    type="date"
+                    value={form.dataProtocolo}
+                    onChange={e => setForm(f => ({ ...f, dataProtocolo: e.target.value }))}
+                    className="input"
+                  />
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <button onClick={() => { setShowModal(false); setForm(emptyForm); setPdfFile(null) }} className="btn-ghost flex-1 justify-center">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button onClick={() => { setShowModal(false); setForm(emptyForm); setPdfFile(null) }} className="btn-ghost flex-1 justify-center py-3 sm:py-2.5">
                   Cancelar
                 </button>
-                <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 justify-center">
+                <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 justify-center py-3 sm:py-2.5">
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                  {saving ? 'Salvando…' : 'Salvar e Analisar'}
+                  {saving ? 'Salvando...' : 'Salvar e Analisar'}
                 </button>
               </div>
             </div>
@@ -511,17 +556,18 @@ export default function ProcessosPage() {
         </div>
       )}
 
+      {/* Delete dialog */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-fade-in">
-          <div className="card w-full max-w-md p-6 space-y-4 shadow-float">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/65 backdrop-blur-sm animate-fade-in">
+          <div className="card w-full sm:max-w-md p-5 sm:p-6 space-y-4 shadow-float rounded-t-2xl sm:rounded-xl">
             <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center mt-0.5">
+              <div className="w-9 h-9 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center mt-0.5 flex-shrink-0">
                 <AlertTriangle size={16} className="text-red-300" />
               </div>
               <div>
                 <h3 className="font-display text-lg font-bold text-brand-cream">Excluir processo</h3>
                 <p className="font-body text-brand-slate text-xs mt-1">
-                  Esta ação é irreversível e removerá o processo da sua lista.
+                  Esta acao e irreversivel e removera o processo da sua lista.
                 </p>
               </div>
             </div>
@@ -553,7 +599,7 @@ export default function ProcessosPage() {
             {deleteStep === 2 && (
               <div className="space-y-3">
                 <p className="font-body text-xs text-brand-slate">
-                  Confirme digitando o número do processo:
+                  Confirme digitando o numero do processo:
                 </p>
                 <p className="font-mono text-xs text-brand-cream bg-brand-navy border border-brand-border rounded-md px-3 py-2">
                   {deleteTarget.numero}
