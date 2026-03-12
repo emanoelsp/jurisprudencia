@@ -69,6 +69,15 @@ export default function AnalisarPage() {
   const [showAgentModal, setShowAgentModal] = useState(false)
   const [agentSteps, setAgentSteps] = useState<Array<{ label: string; done: boolean }>>([])
   const abortRef = useRef<AbortController | null>(null)
+  const [mobilePanel, setMobilePanel] = useState<'results' | 'editor'>('results')
+
+  const INITIAL_AGENT_STEPS: Array<{ label: string; done: boolean }> = [
+    { label: 'Analisei o texto do seu processo para entender o tema e os pedidos.', done: false },
+    { label: 'Busquei jurisprudências compatíveis no DataJud (tribunais) e no seu acervo interno.', done: false },
+    { label: 'Ordenei os resultados por relevância (rerank) e atribuí um percentual de confiança a cada um.', done: false },
+    { label: 'Identifiquei artigos da Constituição Federal e do Código Penal aplicáveis ao caso.', done: false },
+    { label: 'Gerei justificativas em linguagem natural para cada jurisprudência sugerida.', done: false },
+  ]
 
   useEffect(() => { loadProcesso() }, [id])
 
@@ -556,8 +565,9 @@ export default function AnalisarPage() {
             )}
           </div>
 
-	          <div className="px-4 pt-3 space-y-3">
-              <div className="grid grid-cols-5 gap-1.5">
+          <div className="px-3 sm:px-4 pt-3 flex-shrink-0">
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {leftTabButtons.map(({ key, icon: Icon, label }) => (
                 <button
                   key={key}
                   onClick={() => setLeftTab(key)}
@@ -769,40 +779,48 @@ export default function AnalisarPage() {
             )}
 
             {leftTab === 'pareceres' && (
-              <>
-                {usedPareceres.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-12">
-                    <div className="w-14 h-14 rounded-2xl bg-brand-gold/10 border border-brand-gold/20 flex items-center justify-center">
-                      <Library size={24} className="text-brand-gold" />
+              <div className="space-y-3 px-4 pb-4">
+                {knowledgeBasePareceres.length === 0 ? (
+                  <div className="flex items-start gap-3 py-6">
+                    <div className="w-10 h-10 rounded-lg bg-brand-gold/10 border border-brand-gold/20 flex items-center justify-center flex-shrink-0">
+                      <Library size={20} className="text-brand-gold" />
                     </div>
                     <div>
-                      <p className="font-body font-semibold text-brand-cream text-sm">Nenhum parecer reutilizável encontrado</p>
-                      <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
-                        Ao aprovar resultados, sua base interna é atualizada para reuso em análises futuras.
+                      <p className="font-body font-semibold text-brand-cream text-sm">Base de conhecimento</p>
+                      <p className="font-body text-brand-slate text-xs mt-1">
+                        Nenhuma jurisprudência aprovada ainda. Ao clicar em <strong>Aprovar</strong> nos resultados da análise,
+                        os pareceres passam a integrar sua base para reuso em outros processos.
                       </p>
                     </div>
                   </div>
-                )}
-
-                {usedPareceres.map((item, idx) => (
-                  <div key={`${item.id}-${idx}`} className="card p-4 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-body text-sm font-semibold text-brand-cream truncate">
-                        {item.tribunal} -- {item.numero}
-                      </p>
-                      <span className="badge-media text-[10px] flex-shrink-0">
-                        usado {item.usageCount || item.processoIds?.length || 1}x
-                      </span>
-                    </div>
-                    <p className="font-body text-brand-slate text-xs line-clamp-3">{item.ementa}</p>
-                    <button
-                      onClick={() => insertText(`${item.tribunal} -- ${item.numero}\nEMENTA: ${item.ementa}\nRelator: ${item.relator || 'N/D'}, julgado em ${item.dataJulgamento || 'N/D'}.`)}
-                      className="btn-ghost text-xs py-1.5 px-2"
-                    >
-                      Inserir no editor
-                    </button>
-                  </div>
-                ))}
+                ) : (
+                  <>
+                    <p className="font-body text-xs font-semibold text-brand-gold">Jurisprudências já usadas (sua base)</p>
+                    {knowledgeBasePareceres.map((item, idx) => (
+                      <div key={`${item.id}-${idx}`} className="card p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-body text-sm font-semibold text-brand-cream truncate">
+                            {item.tribunal} — {item.numero}
+                          </p>
+                          <span className="badge-media text-[10px] flex-shrink-0">
+                            usado {item.usageCount || item.processoIds?.length || 1}x
+                          </span>
+                        </div>
+                        <p className="font-body text-brand-slate text-xs line-clamp-3">{item.ementa}</p>
+                        <button
+                          onClick={() =>
+                            insertText(
+                              `${item.tribunal} – ${item.numero}\nEMENTA: ${item.ementa}\nRelator: ${
+                                item.relator || 'N/D'
+                              }, julgado em ${item.dataJulgamento || 'N/D'}.`,
+                            )
+                          }
+                          className="btn-ghost text-xs py-1.5 px-2"
+                        >
+                          Inserir no editor
+                        </button>
+                      </div>
+                    ))}
                   </>
                 )}
               </div>
