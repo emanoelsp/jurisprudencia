@@ -68,7 +68,8 @@ cp .env.local.example .env.local
 - **Instale o SDK**: `npm install @google/genai` (mesmo padrão do projeto semantic_agent)
 - Modelos padrão:
   - `AI_CHAT_MODEL=gemini-2.0-flash`
-  - `AI_EMBEDDING_MODEL=text-embedding-004`
+  - `AI_EMBEDDING_MODEL=gemini-embedding-001` (ou `text-embedding-3-small` se usar OpenAI)
+- **Fallback de chat** (quota/erro no Gemini): configure `GROQ_API_KEY` e/ou `OPENROUTER_API_KEY`. Ordem: **Gemini → Groq** (`llama-3.1-8b-instant`) **→ OpenRouter** (`meta-llama/llama-3.1-8b-instruct:free`). Opcional: `GROQ_CHAT_MODEL`, `OPENROUTER_CHAT_MODEL`.
 
 ### 5. (Opcional) Cohere Reranking
 - Para reranking real, obtenha API key em [cohere.com](https://cohere.com)
