@@ -1,6 +1,7 @@
 // src/app/layout.tsx
 import type { Metadata } from 'next'
 import { Playfair_Display, Source_Sans_3, JetBrains_Mono } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/react'
 import { AuthProvider } from '@/lib/auth-context'
 import { Toaster } from 'react-hot-toast'
 import './globals.css'
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               error:   { iconTheme: { primary: '#EF4444', secondary: '#0B1628' } },
             }}
           />
+          <Analytics />
         </AuthProvider>
       </body>
     </html>
