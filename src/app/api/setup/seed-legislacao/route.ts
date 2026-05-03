@@ -31,21 +31,32 @@ function markSeeded(): void {
   }
 }
 
-function isAuthorized(req: NextRequest): boolean {
+function isAuthorized(req: NextRequest): { ok: boolean; reason: string } {
   const secret = process.env.SETUP_SECRET
-  if (!secret) {
-    // Sem SETUP_SECRET: permite apenas em localhost
-    const host = req.headers.get('host') || ''
-    return host.startsWith('localhost') || host.startsWith('127.0.0.1')
-  }
   const auth = req.headers.get('authorization')
-  if (!auth?.startsWith('Bearer ')) return false
-  return auth.slice(7) === secret
+  const host = req.headers.get('host') || ''
+
+  console.log('[seed-legislacao] auth check — SETUP_SECRET set:', !!secret, '| host:', host, '| authorization header:', auth ? auth.slice(0, 15) + '...' : 'none')
+
+  if (!secret) {
+    const isLocal = host.startsWith('localhost') || host.startsWith('127.0.0.1')
+    if (!isLocal) return { ok: false, reason: 'SETUP_SECRET not configured on server and not localhost' }
+    return { ok: true, reason: 'localhost allowed' }
+  }
+
+  if (!auth?.startsWith('Bearer ')) return { ok: false, reason: 'Missing or malformed Authorization header' }
+
+  const token = auth.slice(7)
+  if (token !== secret) return { ok: false, reason: 'Token mismatch' }
+
+  return { ok: true, reason: 'valid token' }
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: 'Unauthorized. Set SETUP_SECRET or call from localhost.' }, { status: 401 })
+  const { ok, reason } = isAuthorized(req)
+  if (!ok) {
+    console.warn('[seed-legislacao] unauthorized:', reason)
+    return NextResponse.json({ error: 'Unauthorized', reason }, { status: 401 })
   }
 
   if (isSeeded()) {
@@ -78,8 +89,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { ok, reason } = isAuthorized(req)
+  if (!ok) {
+    console.warn('[seed-legislacao] unauthorized:', reason)
+    return NextResponse.json({ error: 'Unauthorized', reason }, { status: 401 })
   }
   return NextResponse.json({
     seeded: isSeeded(),
