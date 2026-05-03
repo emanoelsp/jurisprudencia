@@ -7,6 +7,7 @@ import { parseExtractedMetadataJson } from './guards'
 import { queryPinecone } from './pinecone'
 import { fetchDataJudByQuery } from './datajud'
 import { fetchLexMLByQuery } from './lexml'
+import { hashKey, redisGet, redisSet, EMBEDDING_TTL_S } from './cache'
 
 const EMBEDDING_CACHE_TTL_MS = 30 * 60 * 1000
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000
@@ -50,6 +51,30 @@ function normalizeForCache(input: string): string {
 
 function normalizeEmenta(input: string): string {
   return input.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+import { parseLexMLDate } from './lexml'
+
+const LEGISLACAO_FONTES = new Set(['lexml', 'cf_88', 'codigo_penal'])
+
+/** Retorna true se a fonte é de legislação (sujeita a filtro temporal). */
+function isLegislacaoFonte(fonte?: string): boolean {
+  return LEGISLACAO_FONTES.has(fonte || '')
+}
+
+/**
+ * Filtra resultados de legislação que não estavam em vigor na data do fato.
+ * Resultados sem dataVigencia passam sempre (sem metadado = não filtra).
+ */
+function filterByDataFato(results: EprocResult[], dataFato: string): EprocResult[] {
+  return results.filter(r => {
+    if (!isLegislacaoFonte(r.fonte)) return true
+    if (!r.dataVigencia) return true
+    if (r.dataVigencia > dataFato) return false   // lei ainda não existia
+    const revogacao = r.dataRevogacao && r.dataRevogacao !== '9999-12-31' ? r.dataRevogacao : null
+    if (revogacao && revogacao < dataFato) return false  // já revogada antes do fato
+    return true
+  })
 }
 
 // ─── 1. PDF Text Extraction ───────────────────────────────────────────────────
@@ -188,15 +213,24 @@ export function chunkText(text: string, chunkSize = 1000, overlap = 200): string
 export async function generateEmbedding(text: string): Promise<number[]> {
   const input = text.slice(0, 8191)
   const cacheKey = `${aiModels.embedding}:${normalizeForCache(input)}`
-  const cached = getCache(embeddingCache, cacheKey)
-  if (cached) return cached
 
-  const response = await aiClient.embeddings.create({
-    model: aiModels.embedding,
-    input,
-  })
+  // L1: in-memory (quente, sem I/O)
+  const l1 = getCache(embeddingCache, cacheKey)
+  if (l1) return l1
+
+  // L2: Redis / Upstash (persiste entre invocações serverless)
+  const rKey = hashKey('emb', cacheKey)
+  const l2 = await redisGet<number[]>(rKey)
+  if (l2) {
+    setCache(embeddingCache, cacheKey, l2, EMBEDDING_CACHE_TTL_MS) // popula L1
+    return l2
+  }
+
+  const response = await aiClient.embeddings.create({ model: aiModels.embedding, input })
   const embedding = response.data[0].embedding
+
   setCache(embeddingCache, cacheKey, embedding, EMBEDDING_CACHE_TTL_MS)
+  redisSet(rKey, embedding, EMBEDDING_TTL_S).catch(() => {}) // L2 write é fire-and-forget
   return embedding
 }
 
@@ -268,6 +302,8 @@ async function fetchLexMLResults(
       score: 0.75 - i * 0.05,
       badge: scoreToBadge(0.75 - i * 0.05) as 'alta' | 'media' | 'baixa',
       fonte: 'lexml' as const,
+      dataVigencia: parseLexMLDate(d.data || ''),
+      dataRevogacao: '9999-12-31',
     }))
   } catch (err) {
     console.warn('[rag] lexml query failed', err)
@@ -361,6 +397,9 @@ async function fetchPineconeResults(
           score: Number(m.score || 0),
           badge: scoreToBadge(Number(m.score || 0)),
           fonte,
+          dataVigencia: String(m.metadata?.dataVigencia || '') || undefined,
+          dataRevogacao: String(m.metadata?.dataRevogacao || '') || undefined,
+          isHistoricalVersion: Boolean(m.metadata?.isHistoricalVersion),
         }
       })
       .slice(0, topK)
@@ -378,11 +417,12 @@ async function fetchPineconeResults(
 export async function searchHybrid(
   queryText: string,
   topK = 8,
-  options?: { tribunal?: string; namespace?: string }
+  options?: { tribunal?: string; namespace?: string; dataFato?: string }
 ): Promise<EprocResult[]> {
   const tribunal = options?.tribunal?.trim().toUpperCase() || ''
   const namespace = options?.namespace?.trim() || ''
-  const cacheKey = `hybrid::${normalizeForCache(queryText)}::${topK}::${tribunal || 'ALL'}::${namespace || 'default'}`
+  const dataFato = options?.dataFato?.trim() || ''
+  const cacheKey = `hybrid::${normalizeForCache(queryText)}::${topK}::${tribunal || 'ALL'}::${namespace || 'default'}::${dataFato || 'nd'}`
   const cached = getCache(searchCache, cacheKey)
   if (cached) return cached.map(r => ({ ...r }))
 
@@ -434,6 +474,11 @@ export async function searchHybrid(
     results = (await lexmlPromise).slice(0, topK)
   }
 
+  // Camada 1 — filtro temporal: remove legislação não vigente na data do fato
+  if (dataFato && results.length > 0) {
+    results = filterByDataFato(results, dataFato)
+  }
+
   if (results.length > 0) {
     setCache(searchCache, cacheKey, results, SEARCH_CACHE_TTL_MS)
   }
@@ -444,7 +489,7 @@ export async function searchHybrid(
 export async function searchEproc(
   queryText: string,
   topK = 8,
-  options?: { tribunal?: string; namespace?: string; hybrid?: boolean }
+  options?: { tribunal?: string; namespace?: string; hybrid?: boolean; dataFato?: string }
 ): Promise<EprocResult[]> {
   const hybrid = options?.hybrid !== false
   if (hybrid) {
@@ -454,13 +499,18 @@ export async function searchEproc(
   // Fallback: comportamento legado (DataJud primeiro, Pinecone se vazio)
   const tribunal = options?.tribunal?.trim().toUpperCase() || ''
   const namespace = options?.namespace?.trim() || ''
-  const cacheKey = `${normalizeForCache(queryText)}::${topK}::${tribunal || 'ALL'}::${namespace || 'default'}`
+  const dataFato = options?.dataFato?.trim() || ''
+  const cacheKey = `${normalizeForCache(queryText)}::${topK}::${tribunal || 'ALL'}::${namespace || 'default'}::${dataFato || 'nd'}`
   const cached = getCache(searchCache, cacheKey)
   if (cached) return cached.map(r => ({ ...r }))
 
   let results = await fetchDataJudResults(queryText, tribunal, topK)
   if (results.length === 0) {
     results = await fetchPineconeResults(queryText, topK, tribunal, namespace)
+  }
+
+  if (dataFato && results.length > 0) {
+    results = filterByDataFato(results, dataFato)
   }
 
   if (results.length > 0) {

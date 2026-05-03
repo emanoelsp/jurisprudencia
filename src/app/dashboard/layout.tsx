@@ -9,17 +9,20 @@ import Logo from '@/components/ui/Logo'
 import {
   LayoutDashboard, FileText, BookOpen,
   LogOut, ChevronRight, Crown, WalletCards,
-  Menu, X,
+  Menu, X, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
 const nav = [
-  { href: '/dashboard',                     icon: LayoutDashboard, label: 'Visão Geral' },
-  { href: '/dashboard/processos',           icon: FileText,        label: 'Processos' },
-  { href: '/dashboard/base-conhecimento',   icon: BookOpen,        label: 'Base de Conhecimento' },
-  { href: '/dashboard/planos',              icon: WalletCards,     label: 'Planos' },
+  { href: '/dashboard',                     icon: LayoutDashboard, label: 'Visão Geral',           admin: false },
+  { href: '/dashboard/processos',           icon: FileText,        label: 'Processos',             admin: false },
+  { href: '/dashboard/base-conhecimento',   icon: BookOpen,        label: 'Base de Conhecimento',  admin: false },
+  { href: '/dashboard/planos',              icon: WalletCards,     label: 'Planos',                admin: false },
+  { href: '/dashboard/admin',               icon: Zap,             label: 'Admin',                 admin: true  },
 ]
+
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, userData, loading, signOut } = useAuth()
@@ -74,7 +77,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-0.5">
-        {nav.map(({ href, icon: Icon, label }) => {
+        {nav.map(({ href, icon: Icon, label, admin }) => {
+          if (admin && ADMIN_EMAIL && user?.email !== ADMIN_EMAIL) return null
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link

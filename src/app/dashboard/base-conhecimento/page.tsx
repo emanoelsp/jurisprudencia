@@ -1,6 +1,6 @@
 'use client'
 // src/app/dashboard/base-conhecimento/page.tsx
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import {
   collection, query, where, getDocs,
@@ -12,25 +12,55 @@ import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
 import {
   BookOpen, Search, Trash2,
   Loader2, Calendar, User, Hash, AlertTriangle,
-  ArrowLeft,
+  ArrowLeft, Download, X, Sparkles,
 } from 'lucide-react'
 import { formatDate, truncate } from '@/lib/utils'
 import toast from 'react-hot-toast'
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  if (typeof window === 'undefined') return {}
+  const { getAuth } = await import('firebase/auth')
+  const token = await getAuth().currentUser?.getIdToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 export default function BaseConhecimentoPage() {
   const { user }  = useAuth()
   const [items, setItems]   = useState<JurisprudenciaCriada[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch]   = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [usageFilter, setUsageFilter] = useState<'all' | 'reused' | 'single'>('all')
+  const [tribunalFilter, setTribunalFilter] = useState('TODOS')
+  const [semanticMode, setSemanticMode] = useState(false)
+  const [semanticResults, setSemanticResults] = useState<JurisprudenciaCriada[] | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [selected, setSelected] = useState<JurisprudenciaCriada | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<JurisprudenciaCriada | null>(null)
   const [deleteStep, setDeleteStep] = useState<1 | 2>(1)
   const [deletePhraseInput, setDeletePhraseInput] = useState('')
   const [deleteNumeroInput, setDeleteNumeroInput] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { loadItems() }, [user])
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => setDebouncedSearch(search), 350)
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current) }
+  }, [search])
+
+  // Trigger semantic search when in semantic mode and debouncedSearch changes
+  useEffect(() => {
+    if (!semanticMode || debouncedSearch.trim().length < 3) {
+      if (semanticMode) setSemanticResults(null)
+      return
+    }
+    runSemanticSearch(debouncedSearch)
+  }, [semanticMode, debouncedSearch])
 
   async function loadItems() {
     if (!user) return
@@ -48,6 +78,50 @@ export default function BaseConhecimentoPage() {
     setItems(data)
     setLoading(false)
   }
+
+  async function runSemanticSearch(q: string) {
+    setSearching(true)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/base-conhecimento/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ query: q }),
+      })
+      if (!res.ok) throw new Error('Erro na busca semântica.')
+      const data = await res.json()
+      setSemanticResults(data.items || [])
+    } catch (err: any) {
+      toast.error(err.message || 'Erro na busca semântica.')
+      setSemanticResults(null)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/base-conhecimento/export', { headers })
+      if (!res.ok) throw new Error('Erro ao exportar.')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `base-conhecimento-${new Date().toISOString().slice(0, 10)}.html`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Exportação concluída.')
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao exportar.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  // Unique tribunals from loaded items for filter dropdown
+  const tribunalOptions = ['TODOS', ...Array.from(new Set(items.map(i => i.tribunal).filter(Boolean))).sort()]
 
   function openDeleteDialog(item: JurisprudenciaCriada) {
     setDeleteTarget(item)
@@ -81,25 +155,29 @@ export default function BaseConhecimentoPage() {
     }
   }
 
-  const filtered = items.filter(i => {
-    const textMatch =
-      i.titulo?.toLowerCase().includes(search.toLowerCase()) ||
-      i.numero?.toLowerCase().includes(search.toLowerCase()) ||
-      i.tribunal?.toLowerCase().includes(search.toLowerCase()) ||
-      i.ementa?.toLowerCase().includes(search.toLowerCase())
+  // Which items to display: semantic results (when active) or local filter
+  const displayItems = semanticMode && semanticResults !== null
+    ? semanticResults
+    : items.filter(i => {
+        const textMatch =
+          i.titulo?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          i.numero?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          i.tribunal?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          i.ementa?.toLowerCase().includes(debouncedSearch.toLowerCase())
 
-    if (!textMatch) return false
+        if (!textMatch) return false
 
-    const usage = i.usageCount || i.processoIds?.length || (i.processoId ? 1 : 0)
-    if (usageFilter === 'reused') return usage > 1
-    if (usageFilter === 'single') return usage <= 1
-    return true
-  })
+        if (tribunalFilter !== 'TODOS' && i.tribunal !== tribunalFilter) return false
+
+        const usage = i.usageCount || i.processoIds?.length || (i.processoId ? 1 : 0)
+        if (usageFilter === 'reused') return usage > 1
+        if (usageFilter === 'single') return usage <= 1
+        return true
+      })
 
   // Detail view component
   const detailView = selected ? (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 animate-slide-up">
-      {/* Mobile back button */}
       <button
         onClick={() => setSelected(null)}
         className="lg:hidden btn-ghost py-1.5 px-2 text-xs -ml-2 mb-2"
@@ -108,7 +186,6 @@ export default function BaseConhecimentoPage() {
         Voltar para lista
       </button>
 
-      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -126,13 +203,11 @@ export default function BaseConhecimentoPage() {
         </button>
       </div>
 
-      {/* Ementa */}
       <div className="card p-4 sm:p-5 space-y-2">
         <p className="label">Ementa Original (TOON-Verificada)</p>
         <p className="font-body text-brand-slate text-sm leading-relaxed">{selected.ementa}</p>
       </div>
 
-      {/* AI justification */}
       {selected.justificativaIa && (
         <div className="card p-4 sm:p-5 space-y-2 border-brand-indigo/20">
           <p className="label flex items-center gap-1.5">
@@ -143,7 +218,6 @@ export default function BaseConhecimentoPage() {
         </div>
       )}
 
-      {/* Manual edits */}
       {selected.edicaoManual && (
         <div className="card p-4 sm:p-5 space-y-2 border-brand-gold/20">
           <p className="label flex items-center gap-1.5">
@@ -154,7 +228,6 @@ export default function BaseConhecimentoPage() {
         </div>
       )}
 
-      {/* TOON data */}
       {selected.toonData && (
         <div className="card p-4 sm:p-5 space-y-3">
           <p className="label">Dados TOON (Anti-Alucinacao)</p>
@@ -176,7 +249,6 @@ export default function BaseConhecimentoPage() {
     </div>
   ) : null
 
-  // Placeholder view
   const placeholderView = (
     <div className="hidden lg:flex flex-col items-center justify-center h-full gap-4 text-center p-12">
       <div className="w-16 h-16 rounded-2xl bg-brand-gold/10 border border-brand-gold/20 flex items-center justify-center">
@@ -194,38 +266,89 @@ export default function BaseConhecimentoPage() {
     </div>
   )
 
-  // Sidebar list component
   const listPanel = (
     <div className={`flex flex-col h-full ${selected ? 'hidden lg:flex' : 'flex'}`}>
       <div className="p-4 sm:p-5 border-b border-brand-border">
         <div className="flex items-center gap-2 mb-3 sm:mb-4">
           <BookOpen size={18} className="text-brand-gold flex-shrink-0" />
-          <h1 className="font-display font-bold text-brand-cream text-base sm:text-lg">Base de Conhecimento</h1>
+          <h1 className="font-display font-bold text-brand-cream text-base sm:text-lg flex-1">Base de Conhecimento</h1>
+          <button
+            onClick={handleExport}
+            disabled={exporting || items.length === 0}
+            title="Exportar como HTML"
+            className="btn-ghost py-1.5 px-2 text-xs disabled:opacity-50"
+          >
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            <span className="hidden sm:inline">Exportar</span>
+          </button>
         </div>
+
+        {/* Search bar with semantic toggle */}
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-slate" />
+          {searching
+            ? <Loader2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-slate animate-spin" />
+            : <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-slate" />
+          }
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar jurisprudencias..."
-            className="input pl-8 text-xs"
+            placeholder={semanticMode ? 'Busca semântica (IA)...' : 'Buscar jurisprudencias...'}
+            className="input pl-8 pr-8 text-xs"
           />
-        </div>
-        <div className="grid grid-cols-3 gap-1.5 mt-3">
-          {(['all', 'reused', 'single'] as const).map(filter => (
+          {search && (
             <button
-              key={filter}
-              onClick={() => setUsageFilter(filter)}
-              className={`text-[11px] px-2 py-1.5 rounded-md border transition-colors ${
-                usageFilter === filter
-                  ? 'bg-brand-indigo/15 border-brand-indigo/30 text-brand-cream'
-                  : 'border-brand-border text-brand-slate hover:text-brand-cream'
-              }`}
+              onClick={() => { setSearch(''); setSemanticResults(null) }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-brand-slate hover:text-brand-cream"
             >
-              {filter === 'all' ? 'Todas' : filter === 'reused' ? 'Reutilizadas' : 'Uso unico'}
+              <X size={13} />
             </button>
-          ))}
+          )}
         </div>
+
+        {/* Semantic search toggle */}
+        <button
+          onClick={() => { setSemanticMode(m => !m); setSemanticResults(null) }}
+          className={`mt-2 flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-md border transition-colors ${
+            semanticMode
+              ? 'bg-brand-indigo/15 border-brand-indigo/30 text-brand-indigo'
+              : 'border-brand-border text-brand-slate hover:text-brand-cream'
+          }`}
+        >
+          <Sparkles size={11} />
+          {semanticMode ? 'Busca semântica ativa' : 'Ativar busca semântica'}
+        </button>
+
+        {/* Tribunal filter */}
+        {!semanticMode && tribunalOptions.length > 2 && (
+          <select
+            value={tribunalFilter}
+            onChange={e => setTribunalFilter(e.target.value)}
+            className="input mt-2 text-xs py-1.5"
+          >
+            {tribunalOptions.map(t => (
+              <option key={t} value={t}>{t === 'TODOS' ? 'Todos os tribunais' : t}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Usage filter tabs */}
+        {!semanticMode && (
+          <div className="grid grid-cols-3 gap-1.5 mt-2">
+            {(['all', 'reused', 'single'] as const).map(filter => (
+              <button
+                key={filter}
+                onClick={() => setUsageFilter(filter)}
+                className={`text-[11px] px-2 py-1.5 rounded-md border transition-colors ${
+                  usageFilter === filter
+                    ? 'bg-brand-indigo/15 border-brand-indigo/30 text-brand-cream'
+                    : 'border-brand-border text-brand-slate hover:text-brand-cream'
+                }`}
+              >
+                {filter === 'all' ? 'Todas' : filter === 'reused' ? 'Reutilizadas' : 'Uso unico'}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -233,19 +356,21 @@ export default function BaseConhecimentoPage() {
           <div className="flex justify-center p-8">
             <Loader2 className="text-brand-indigo animate-spin" size={20} />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : displayItems.length === 0 ? (
           <div className="p-8 text-center space-y-2">
             <BookOpen size={28} className="text-brand-border mx-auto" />
             <p className="font-body text-brand-slate text-xs">
               {search ? 'Nenhum resultado.' : 'Nenhuma jurisprudencia salva ainda.'}
             </p>
-            <p className="font-body text-brand-slate text-xs">
-              As jurisprudencias aprovadas nos processos aparecerao aqui.
-            </p>
+            {!search && (
+              <p className="font-body text-brand-slate text-xs">
+                As jurisprudencias aprovadas nos processos aparecerao aqui.
+              </p>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-brand-border">
-            {filtered.map(item => (
+            {displayItems.map(item => (
               <button
                 key={item.id}
                 onClick={() => setSelected(item)}
@@ -284,12 +409,10 @@ export default function BaseConhecimentoPage() {
   return (
     <div className="flex h-[calc(100vh-56px)] lg:h-screen overflow-hidden animate-fade-in">
 
-      {/* Sidebar list - full width on mobile when no selection, 320px on desktop */}
       <div className={`w-full lg:w-80 border-r border-brand-border flex-shrink-0 ${selected ? 'hidden lg:block' : 'block'}`}>
         {listPanel}
       </div>
 
-      {/* Detail view */}
       <div className={`flex-1 overflow-y-auto ${selected ? 'block' : 'hidden lg:block'}`}>
         {selected ? detailView : placeholderView}
       </div>

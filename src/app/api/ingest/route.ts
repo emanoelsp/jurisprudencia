@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { extractTextFromBuffer, extractMetadata } from '@/lib/rag'
 import { requireServerAuth } from '@/lib/server-auth'
+import { sanitizePii } from '@/lib/pii'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -52,11 +53,12 @@ export async function POST(req: NextRequest) {
     const text   = await extractTextFromBuffer(buffer)
     console.log('[ingest] extractTextFromBuffer done', { ms: Date.now() - tExtract, chars: text.length })
 
-    // Auto-fill extraction
+    // Auto-fill extraction — sanitize PII before sending to external LLM (LGPD)
+    const textForLlm = sanitizePii(text)
     const tMeta = Date.now()
     let metadata = quickMetadataFallback(text)
     try {
-      metadata = await withTimeout(extractMetadata(text), 5000)
+      metadata = await withTimeout(extractMetadata(textForLlm), 5000)
     } catch (metaErr) {
       console.warn('[ingest] extractMetadata timeout/fallback', metaErr)
     }

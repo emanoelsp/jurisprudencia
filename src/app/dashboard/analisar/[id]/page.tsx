@@ -2,17 +2,19 @@
 // src/app/dashboard/analisar/[id]/page.tsx
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, collection, addDoc, getDocs, orderBy, query as fsQuery, limit as fsLimit } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/lib/auth-context'
 import { normalizePlan } from '@/lib/plans'
 import type { Processo, EprocResult, AnalysisChunk, JurisprudenciaCriada } from '@/types'
 import EprocResultCard from '@/components/features/EprocResultCard'
 import { SkeletonList, SkeletonLine } from '@/components/ui/Skeleton'
+import LegalEditor, { type LegalEditorRef } from '@/components/ui/LegalEditor'
 import {
   Sparkles, Save, CheckCircle, AlertCircle,
   ArrowLeft, FileText, Loader2, Cpu,
   Shield, AlignLeft, Library, Database, Scale, BookOpen, Gavel, ChevronDown,
+  History, X, Expand, AlertTriangle,
 } from 'lucide-react'
 import { statusLabel, statusColor, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -50,6 +52,7 @@ export default function AnalisarPage() {
   const [justificativas, setJustificativas] = useState<Record<string, string>>({})
   const [streamingId, setStreamingId]     = useState<string | null>(null)
   const [editorContent, setEditorContent] = useState('')
+  const editorRef = useRef<LegalEditorRef>(null)
   const [saving, setSaving]               = useState(false)
   const [toonValid, setToonValid]         = useState<boolean | null>(null)
   const [usedPareceres, setUsedPareceres] = useState<JurisprudenciaCriada[]>([])
@@ -72,13 +75,17 @@ export default function AnalisarPage() {
   const abortRef = useRef<AbortController | null>(null)
   const [mobilePanel, setMobilePanel] = useState<'results' | 'editor'>('results')
   const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [showVersionsPanel, setShowVersionsPanel] = useState(false)
+  const [versions, setVersions] = useState<Array<{ id: string; savedAt: string; type: 'draft' | 'approved'; preview: string }>>([])
+  const [loadingVersions, setLoadingVersions] = useState(false)
+  const [showExpandModal, setShowExpandModal] = useState(false)
 
   const INITIAL_AGENT_STEPS: Array<{ label: string; done: boolean }> = [
-    { label: 'Analisei o texto do seu processo para entender o tema e os pedidos.', done: false },
-    { label: 'Busquei jurisprudências compatíveis no DataJud (tribunais) e no seu acervo interno.', done: false },
-    { label: 'Ordenei os resultados por relevância (rerank) e atribuí um percentual de confiança a cada um.', done: false },
-    { label: 'Identifiquei artigos da Constituição Federal e do Código Penal aplicáveis ao caso.', done: false },
-    { label: 'Gerei justificativas em linguagem natural para cada jurisprudência sugerida.', done: false },
+    { label: 'Analisei o texto do processo para extrair tema, pedidos e causa de pedir.', done: false },
+    { label: 'Busquei em DataJud CNJ, base interna (Pinecone), LexML e STJ Dados Abertos em paralelo.', done: false },
+    { label: 'Fusão RRF + reranking Cohere: ordenei resultados por relevância e atribuí grau de confiança.', done: false },
+    { label: 'Identifiquei artigos da CF/88 e do Código Penal aplicáveis. LexML adicionado às Bases.', done: false },
+    { label: 'Gerei justificativas com TOON (anti-alucinação) para cada jurisprudência sugerida.', done: false },
   ]
 
   useEffect(() => { loadProcesso() }, [id])
@@ -174,6 +181,7 @@ export default function AnalisarPage() {
           texto: processo.textoOriginal,
           tribunal: isFreePlan ? (processo.tribunal || 'TODOS') : selectedTribunal,
           expandScope: isFreePlan ? false : !!options?.expandScope,
+          dataProtocolo: processo.dataProtocolo || '',
         }),
         signal: abortRef.current.signal,
       })
@@ -294,13 +302,38 @@ export default function AnalisarPage() {
   }
 
   function insertText(text: string) {
-    setEditorContent(prev => {
-      const separator = prev.endsWith('\n') || prev === '' ? '' : '\n\n'
-      return prev + separator + text
-    })
+    editorRef.current?.insertContent(text)
+    // onChange do LegalEditor sincroniza editorContent automaticamente
     toast.success('Jurisprudencia inserida no editor!')
-    // Switch to editor on mobile
     setMobilePanel('editor')
+  }
+
+  async function saveVersion(content: string, type: 'draft' | 'approved') {
+    try {
+      const versaoRef = collection(db, 'processos', id, 'versoes')
+      await addDoc(versaoRef, {
+        savedAt: new Date().toISOString(),
+        type,
+        content,
+        preview: content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120),
+      })
+    } catch (err) {
+      console.warn('[versoes] save failed', err)
+    }
+  }
+
+  async function loadVersions() {
+    setLoadingVersions(true)
+    try {
+      const versaoRef = collection(db, 'processos', id, 'versoes')
+      const q = fsQuery(versaoRef, orderBy('savedAt', 'desc'), fsLimit(10))
+      const snap = await getDocs(q)
+      setVersions(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
+    } catch (err) {
+      console.error('[versoes] load failed', err)
+    } finally {
+      setLoadingVersions(false)
+    }
   }
 
   async function handleSave(approve = false) {
@@ -313,8 +346,12 @@ export default function AnalisarPage() {
         }
       }
 
+      const currentContent = editorRef.current?.getHTML() ?? editorContent
+      // Archive current version before overwriting
+      await saveVersion(currentContent, approve ? 'approved' : 'draft')
+
       const upd: Partial<Processo> = {
-        teseFinal: editorContent,
+        teseFinal: currentContent,
         updatedAt: new Date().toISOString(),
       }
       if (approve) {
@@ -340,7 +377,7 @@ export default function AnalisarPage() {
       processoId: id,
       result,
       justificativaIa: justificativas[result.id] || '',
-      edicaoManual: editorContent || result.ementa,
+      edicaoManual: (editorRef.current?.getHTML() || editorContent) || result.ementa,
     }))
 
     const responses = await Promise.all(
@@ -394,8 +431,12 @@ export default function AnalisarPage() {
 
   if (!processo) return null
 
+  const stjCount = results.filter(r => r.fonte === 'stj_dados_abertos').length
+  const lexmlCount = results.filter(r => r.fonte === 'lexml').length
+  const datajudLabel = `Resultados${stjCount > 0 ? ` · STJ(${stjCount})` : ''}${lexmlCount > 0 ? ` · LexML(${lexmlCount})` : ''}`
+
   const leftTabButtons = [
-    { key: 'datajud' as const, icon: Database, label: 'DataJud' },
+    { key: 'datajud' as const, icon: Database, label: datajudLabel },
     { key: 'bases_publicas' as const, icon: BookOpen, label: 'Bases' },
     { key: 'codigo_penal' as const, icon: Gavel, label: 'CP' },
     { key: 'constitucional' as const, icon: Scale, label: 'CF/88' },
@@ -584,12 +625,20 @@ export default function AnalisarPage() {
             )}
           </button>
           <button
-            onClick={() => !isFreePlan && startAnalysis({ expandScope: true })}
+            onClick={() => !isFreePlan && setShowExpandModal(true)}
             disabled={analyzing || isFreePlan}
             title={isFreePlan ? 'Faca upgrade para ampliar tribunais' : undefined}
             className={`text-xs py-2 px-3 ${isFreePlan ? 'opacity-50 cursor-not-allowed btn-ghost' : 'btn-ghost'}`}
           >
+            <Expand size={14} />
             Ampliar tribunais
+          </button>
+          <button
+            onClick={() => { setShowVersionsPanel(true); loadVersions() }}
+            className="btn-ghost text-xs py-2 px-2"
+            title="Histórico de versões"
+          >
+            <History size={14} />
           </button>
           <button onClick={() => handleSave(false)} disabled={saving} className="btn-ghost text-xs py-2 px-3">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
@@ -660,7 +709,7 @@ export default function AnalisarPage() {
           <div className="flex items-center justify-between px-3 sm:px-5 py-2.5 sm:py-3 border-b border-brand-border bg-brand-navylt flex-shrink-0">
             <div className="flex items-center gap-2 flex-wrap">
               <Cpu size={14} className="text-brand-indigo flex-shrink-0" />
-              <span className="font-body font-semibold text-brand-cream text-xs sm:text-sm">Resultados DataJud CNJ</span>
+              <span className="font-body font-semibold text-brand-cream text-xs sm:text-sm">Resultados da Análise</span>
               {isFreePlan ? (
                 <span className="bg-brand-navy/50 border border-brand-border rounded-md text-[11px] text-brand-slate px-2 py-1 font-mono">
                   {processo.tribunal || 'TODOS'}
@@ -768,7 +817,7 @@ export default function AnalisarPage() {
                     <div>
                       <p className="font-body font-semibold text-brand-cream text-sm">Pronto para analise</p>
                       <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
-                        Clique em &quot;Analisar com JurisprudencIA&quot; para buscar jurisprudencias relevantes na base DataJud CNJ e no seu acervo interno.
+                        Clique em &quot;Analisar&quot; para buscar em DataJud CNJ, LexML, STJ Dados Abertos e no seu acervo interno.
                       </p>
                     </div>
                   </div>
@@ -803,6 +852,7 @@ export default function AnalisarPage() {
                     onInsert={insertText}
                     streaming={streamingId === result.id}
                     justificativa={justificativas[result.id]}
+                    dataFato={processo?.dataProtocolo}
                   />
                 ))}
               </>
@@ -1030,9 +1080,6 @@ export default function AnalisarPage() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-body text-brand-slate text-[11px] sm:text-xs">
-                {editorContent.split(/\s+/).filter(Boolean).length} palavras
-              </span>
               {processo.aprovadoPeloAdvogado && (
                 <span className="badge-alta gap-1">
                   <CheckCircle size={10} />
@@ -1055,11 +1102,11 @@ export default function AnalisarPage() {
                 </p>
               </div>
 
-              <textarea
-                value={editorContent}
-                onChange={e => setEditorContent(e.target.value)}
+              <LegalEditor
+                ref={editorRef}
+                initialContent={editorContent}
                 placeholder="O conteudo da peca juridica aparecera aqui. Use o botao 'Inserir no Editor' nas jurisprudencias ao lado para construir sua argumentacao, ou escreva diretamente..."
-                className="legal-editor w-full min-h-[300px] sm:min-h-[500px] bg-transparent resize-none focus:outline-none text-sm leading-loose placeholder-brand-border"
+                onChange={html => setEditorContent(html)}
               />
             </div>
           </div>
@@ -1090,6 +1137,119 @@ export default function AnalisarPage() {
           Aprovar
         </button>
       </div>
+
+      {/* ── Version History Panel ── */}
+      {showVersionsPanel && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            className="flex-1 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowVersionsPanel(false)}
+          />
+          <div className="w-full max-w-sm bg-brand-navylt border-l border-brand-border flex flex-col animate-slide-up">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-brand-border">
+              <div className="flex items-center gap-2">
+                <History size={16} className="text-brand-indigo" />
+                <span className="font-body font-semibold text-brand-cream text-sm">Histórico de Versões</span>
+              </div>
+              <button onClick={() => setShowVersionsPanel(false)} className="text-brand-slate hover:text-brand-cream p-1">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {loadingVersions ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 size={20} className="animate-spin text-brand-indigo" />
+                </div>
+              ) : versions.length === 0 ? (
+                <div className="text-center py-8 space-y-2">
+                  <History size={28} className="text-brand-border mx-auto" />
+                  <p className="font-body text-brand-slate text-xs">Nenhuma versao salva ainda.</p>
+                  <p className="font-body text-brand-slate text-xs">As versoes aparecem aqui apos cada salvamento.</p>
+                </div>
+              ) : versions.map(v => (
+                <div key={v.id} className="card p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${
+                      v.type === 'approved'
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                        : 'bg-brand-indigo/10 border-brand-indigo/30 text-brand-indigo'
+                    }`}>
+                      {v.type === 'approved' ? 'Aprovado' : 'Rascunho'}
+                    </span>
+                    <span className="font-mono text-[10px] text-brand-slate">
+                      {new Date(v.savedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  {v.preview && (
+                    <p className="font-body text-brand-slate text-xs line-clamp-2">{v.preview}</p>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (editorRef.current) {
+                        // Load version content into editor — requires getting full content
+                        // For now, show a toast; full restore would need content field
+                        toast('Para restaurar, copie o conteudo da versao manualmente.', { icon: 'ℹ️' })
+                      }
+                    }}
+                    className="btn-ghost text-xs py-1 px-2 w-full justify-center"
+                  >
+                    Ver esta versao
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="px-4 py-3 border-t border-brand-border">
+              <p className="font-body text-brand-slate text-[10px]">
+                As ultimas 10 versoes sao mantidas automaticamente.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Expand Scope Confirmation Modal ── */}
+      {showExpandModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-fade-in">
+          <div className="card w-full max-w-md p-5 sm:p-6 space-y-4 shadow-float">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-brand-gold/10 border border-brand-gold/25 flex items-center justify-center mt-0.5 flex-shrink-0">
+                <Expand size={16} className="text-brand-gold" />
+              </div>
+              <div>
+                <h3 className="font-display text-base font-bold text-brand-cream">Ampliar para todos os tribunais</h3>
+                <p className="font-body text-brand-slate text-xs mt-1">
+                  Esta analise buscara em <strong className="text-brand-cream">todos os tribunais do Brasil</strong> (STF, STJ, TRFs, TJs), consumindo cota adicional de IA e levando mais tempo.
+                </p>
+              </div>
+            </div>
+            <div className="bg-brand-navy/60 border border-brand-gold/15 rounded-lg p-3 space-y-1">
+              <div className="flex items-center gap-2 text-xs">
+                <AlertTriangle size={12} className="text-brand-gold flex-shrink-0" />
+                <span className="text-brand-slate">Consome cota de IA adicional desta analise</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <AlertTriangle size={12} className="text-brand-gold flex-shrink-0" />
+                <span className="text-brand-slate">Pode levar de 30 a 90 segundos a mais</span>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setShowExpandModal(false)}
+                className="btn-ghost flex-1 justify-center text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { setShowExpandModal(false); startAnalysis({ expandScope: true }) }}
+                className="btn-gold flex-1 justify-center text-sm"
+              >
+                <Expand size={14} />
+                Confirmar busca ampliada
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -54,9 +54,13 @@ export interface EprocResult {
   rerankScore?: number    // cohere reranker score
   badge: ConfidenceBadge
   toonData?: ToonPayload
-  fonte?: 'datajud_cnj' | 'base_interna' | 'mock' | 'lexml' | 'stj_dados_abertos'
+  fonte?: 'datajud_cnj' | 'base_interna' | 'mock' | 'lexml' | 'stj_dados_abertos' | 'cf_88' | 'codigo_penal' | 'user'
   alreadyUsed?: boolean
   usageCount?: number
+  // Temporal versioning (Camada 1) — populated for legislation sources only
+  dataVigencia?: string   // YYYY-MM-DD — when this law version entered into force
+  dataRevogacao?: string  // YYYY-MM-DD or '9999-12-31' — '9999-12-31' means still in force
+  isHistoricalVersion?: boolean  // true when this was fetched for a specific past date (Camada 3)
 }
 
 // TOON = Typed Object-Oriented Notation

@@ -72,6 +72,8 @@ export async function runLegislacaoIngest(
               relator: '',
               dataJulgamento: '',
               fonte: 'cf_88',
+              dataVigencia: '1988-10-05',   // promulgação CF/88
+              dataRevogacao: '9999-12-31',  // vigente
               ingestedAt: new Date().toISOString(),
             },
           })
@@ -103,6 +105,8 @@ export async function runLegislacaoIngest(
               relator: '',
               dataJulgamento: '',
               fonte: 'codigo_penal',
+              dataVigencia: '1942-01-01',   // vigência original Decreto-Lei 2.848/1940
+              dataRevogacao: '9999-12-31',  // vigente (com redações parciais)
               ingestedAt: new Date().toISOString(),
             },
           })

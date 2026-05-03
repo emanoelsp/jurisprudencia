@@ -28,6 +28,8 @@ import { parseToonBasesPublicas } from '@/lib/toon-bases-publicas'
 import { parseToonCf } from '@/lib/toon-cf'
 import { extractCausaPetendi } from '@/lib/tools/extract-causa-petendi'
 import type { AnalysisChunk } from '@/types'
+import { sanitizePii } from '@/lib/pii'
+import { createTrace } from '@/lib/langfuse'
 
 function parseBasesPublicasResponse(raw: string): Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }> {
   const toonResults = parseToonBasesPublicas(raw)
@@ -354,7 +356,8 @@ export async function POST(req: NextRequest) {
     return new Response(err?.message || 'Invalid request', { status: 400 })
   }
 
-  const { processoId, texto, topResults, minConfidence, tribunal, expandScope } = payload
+  const { processoId, texto, topResults, minConfidence, tribunal, expandScope, dataProtocolo } = payload
+  const dataFato = typeof dataProtocolo === 'string' && dataProtocolo.match(/^\d{4}-\d{2}-\d{2}$/) ? dataProtocolo : ''
   const topResultsLimit = resolveTopResults(topResults)
   const minConfidenceScore = resolveMinConfidence(minConfidence)
   const tribunalRaw = typeof tribunal === 'string' ? tribunal.trim().toUpperCase() : ''
@@ -396,6 +399,18 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // LGPD: sanitize PII before any third-party LLM call; keep raw texto for local ops (TOON, scoring)
+  const textoParaIA = sanitizePii(texto)
+
+  // Observabilidade — fire-and-forget, nunca bloqueia o pipeline
+  const trace = createTrace({
+    id: reqId,
+    name: 'analyze',
+    userId: authUser.uid,
+    metadata: { processoId, tribunal: tribunalFilter || 'ALL', plan: plan.name, textoChars: texto.length },
+    tags: ['analyze', plan.name],
+  })
+
   const stream = new ReadableStream({
     async start(controller) {
       const send = (chunk: AnalysisChunk) => {
@@ -416,6 +431,7 @@ export async function POST(req: NextRequest) {
         const mark429 = () => { geminiQuotaExceeded = true }
 
         const invokeLlmForExtract = async (system: string, user: string) => {
+          const gen = trace.generation({ name: 'extract', model: aiModels.chat, input: { systemLen: system.length, userLen: user.length } })
           const result = await callGeminiWithRetry(
             () => aiClient.chat.completions.create({
               model: aiModels.chat,
@@ -430,11 +446,13 @@ export async function POST(req: NextRequest) {
             mark429
           )
           if (!result.ok) throw new Error('Gemini quota exceeded')
-          return result.data.choices?.[0]?.message?.content || ''
+          const text = result.data.choices?.[0]?.message?.content || ''
+          gen.end({ text })
+          return text
         }
 
         // ─── Step 0: Sub-agente extract_causa_petendi (query RAG otimizada) ─
-        const extractCausaPetendiPromise = extractCausaPetendi(texto, invokeLlmForExtract)
+        const extractCausaPetendiPromise = extractCausaPetendi(textoParaIA, invokeLlmForExtract)
 
         // ─── Step 0a: Bases Públicas (IA) – TOON como semantic_agent, sem response_format ─
         const basesPublicasPromise = (async () => {
@@ -442,7 +460,7 @@ export async function POST(req: NextRequest) {
             const cpResumo = getCodigoPenalResumoParaIA(4000)
             const systemContent = BASES_PUBLICAS_SYSTEM + '\n\n' + BASES_PUBLICAS_FEW_SHOT +
               '\n\nOBRIGATÓRIO: Retorne ao menos 1 bloco ⟨BP⟩...⟨/BP⟩. Se o processo for jurídico, cite artigos do CP, CF, CDC, súmulas ou jurisprudência relevante.'
-            const userContent = BASES_PUBLICAS_USER_PREFIX + texto.slice(0, 2800) +
+            const userContent = BASES_PUBLICAS_USER_PREFIX + textoParaIA.slice(0, 2800) +
               (cpResumo ? `\n\nREFERÊNCIA - Código Penal (artigos principais):\n${cpResumo}\n\nUse os artigos acima quando aplicáveis.` : '')
 
             const result = await callGeminiWithRetry(
@@ -494,7 +512,7 @@ OBRIGATÓRIO: Retorne ao menos 1 bloco ⟨BP⟩...⟨/BP⟩ quando houver matér
                   },
                   {
                     role: 'user',
-                    content: `PROCESSO:\n${texto.slice(0, 2800)}\n\nARTIGOS DO CÓDIGO PENAL:\n${cpResumo}\n\nIdentifique os artigos do CP aplicáveis e retorne no formato TOON ⟨BP⟩...⟨/BP⟩.`,
+                    content: `PROCESSO:\n${textoParaIA.slice(0, 2800)}\n\nARTIGOS DO CÓDIGO PENAL:\n${cpResumo}\n\nIdentifique os artigos do CP aplicáveis e retorne no formato TOON ⟨BP⟩...⟨/BP⟩.`,
                   },
                 ],
               }),
@@ -544,7 +562,7 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
                   },
                   {
                     role: 'user',
-                    content: `PROCESSO:\n${texto.slice(0, 2500)}\n\nARTIGOS CF/88:\n${resumo}\n\nIdentifique os artigos aplicáveis e retorne no formato TOON.`,
+                    content: `PROCESSO:\n${textoParaIA.slice(0, 2500)}\n\nARTIGOS CF/88:\n${resumo}\n\nIdentifique os artigos aplicáveis e retorne no formato TOON.`,
                   },
                 ],
               }),
@@ -576,32 +594,67 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
           queryRag,
           8,
           shouldExpandScope
-            ? { ...(clientNamespace ? { namespace: clientNamespace } : {}) }
-            : ({
-              ...(tribunalFilter ? { tribunal: tribunalFilter } : {}),
-              ...(clientNamespace ? { namespace: clientNamespace } : {}),
-            })
+            ? {
+                ...(clientNamespace ? { namespace: clientNamespace } : {}),
+                ...(dataFato ? { dataFato } : {}),
+              }
+            : {
+                ...(tribunalFilter ? { tribunal: tribunalFilter } : {}),
+                ...(clientNamespace ? { namespace: clientNamespace } : {}),
+                ...(dataFato ? { dataFato } : {}),
+              }
         )
-        console.log('[analyze] step searchEproc', { reqId, ms: Date.now() - tSearch, count: rawResults.length })
+        // LexML retorna legislação/normas com URN como "número" — separar ANTES do rerank.
+        // Assim chegam sempre na aba Bases sem competir por score com jurisprudência real.
+        const rawLexmlItems = rawResults.filter(r => r.fonte === 'lexml')
+        const rawJurisprudencia = rawResults.filter(r => r.fonte !== 'lexml')
+
+        console.log('[analyze] step searchEproc', {
+          reqId,
+          ms: Date.now() - tSearch,
+          total: rawResults.length,
+          datajud: rawResults.filter(r => r.fonte === 'datajud_cnj').length,
+          pinecone: rawResults.filter(r => r.fonte === 'base_interna').length,
+          lexml: rawLexmlItems.length,
+          stj_ckan: rawResults.filter(r => r.fonte === 'stj_dados_abertos').length,
+        })
+        const fontesFound = Array.from(new Set(rawResults.map(r => r.fonte || 'base_interna'))).filter(Boolean)
         send({
           type: 'metadata',
           data: {
-            rag_source: rawResults.some(r => r.fonte === 'base_interna') ? 'pinecone' : 'datajud_cnj',
+            rag_source: fontesFound.join(','),
+            rag_sources_count: {
+              datajud: rawResults.filter(r => r.fonte === 'datajud_cnj').length,
+              pinecone: rawResults.filter(r => r.fonte === 'base_interna').length,
+              lexml: rawLexmlItems.length,
+              stj_ckan: rawResults.filter(r => r.fonte === 'stj_dados_abertos').length,
+            },
           } as any,
         })
 
-        // ─── Step 2: Reranking ───────────────────────────
+        // Helper: converte itens LexML → formato bases_publicas
+        const lexmlToBases = (items: typeof rawLexmlItems) => items.map(r => ({
+          id: r.id,
+          tipo: 'legislacao',
+          fonte: r.numero.startsWith('urn:')
+            ? `LexML${r.tribunal && r.tribunal !== 'LexML' ? ` – ${r.tribunal}` : ''}`
+            : r.numero,
+          ementa: r.ementa,
+          aplicabilidade: `Fonte: LexML${r.dataJulgamento ? ` · ${r.dataJulgamento}` : ''}`,
+        }))
+
+        // ─── Step 2: Reranking (somente jurisprudência, LexML não compete por score) ──
         const tRerank = Date.now()
-        const reranked = await rerankResults(queryRag, rawResults)
+        const reranked = await rerankResults(queryRag, rawJurisprudencia)
         const deduped = dedupeEprocResults(reranked)
 
         if (deduped.length < MIN_RESULTS_FOR_ANALYSIS) {
           console.warn('[analyze] too few results', { reqId, count: deduped.length, min: MIN_RESULTS_FOR_ANALYSIS })
           send({ type: 'results', results: deduped })
-          // Ainda assim, tenta preencher abas (Bases/CP/CF) para ajudar o advogado
           const [cfArticlesFew, basesPublicasFew, codigoPenalFew] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
-          const { cf: cfValidadosFew, cp: cpValidadosFew } = await validateLegislacaoComRag(texto, cfArticlesFew, codigoPenalFew)
-          send({ type: 'metadata', data: { cf_articles: cfValidadosFew, bases_publicas: basesPublicasFew, codigo_penal: cpValidadosFew, gemini_quota_exceeded: geminiQuotaExceeded } as any })
+          const { cf: cfValidadosFew, cp: cpValidadosFew } = await validateLegislacaoComRag(textoParaIA, cfArticlesFew, codigoPenalFew)
+          // LexML sempre aparece nas Bases mesmo quando há poucos resultados de jurisprudência
+          send({ type: 'metadata', data: { cf_articles: cfValidadosFew, bases_publicas: [...basesPublicasFew, ...lexmlToBases(rawLexmlItems)], codigo_penal: cpValidadosFew, gemini_quota_exceeded: geminiQuotaExceeded } as any })
           send({
             type: 'error',
             error: 'Poucos precedentes encontrados; amplie o tribunal ou o texto do processo.',
@@ -649,8 +702,8 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
           })
           send({ type: 'results', results: [] })
           const [cfArticlesEarly, basesPublicasEarly, codigoPenalEarly] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
-          const { cf: cfValidadosEarly, cp: cpValidadosEarly } = await validateLegislacaoComRag(texto, cfArticlesEarly, codigoPenalEarly)
-          send({ type: 'metadata', data: { cf_articles: cfValidadosEarly, bases_publicas: basesPublicasEarly, codigo_penal: cpValidadosEarly, gemini_quota_exceeded: geminiQuotaExceeded } as any })
+          const { cf: cfValidadosEarly, cp: cpValidadosEarly } = await validateLegislacaoComRag(textoParaIA, cfArticlesEarly, codigoPenalEarly)
+          send({ type: 'metadata', data: { cf_articles: cfValidadosEarly, bases_publicas: [...basesPublicasEarly, ...lexmlToBases(rawLexmlItems)], codigo_penal: cpValidadosEarly, gemini_quota_exceeded: geminiQuotaExceeded } as any })
           send({
             type: 'error',
             error: shouldExpandScope
@@ -669,29 +722,31 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
           })
           send({ type: 'results', results: topRanked })
           const [cfArticlesAbstain, basesPublicasAbstain, codigoPenalAbstain] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
-          const { cf: cfValidadosAbstain, cp: cpValidadosAbstain } = await validateLegislacaoComRag(texto, cfArticlesAbstain, codigoPenalAbstain)
-          send({ type: 'metadata', data: { cf_articles: cfValidadosAbstain, bases_publicas: basesPublicasAbstain, codigo_penal: cpValidadosAbstain, gemini_quota_exceeded: geminiQuotaExceeded } as any })
+          const { cf: cfValidadosAbstain, cp: cpValidadosAbstain } = await validateLegislacaoComRag(textoParaIA, cfArticlesAbstain, codigoPenalAbstain)
+          send({ type: 'metadata', data: { cf_articles: cfValidadosAbstain, bases_publicas: [...basesPublicasAbstain, ...lexmlToBases(rawLexmlItems)], codigo_penal: cpValidadosAbstain, gemini_quota_exceeded: geminiQuotaExceeded } as any })
           send({ type: 'error', error: buildAbstainMessage({ retrievalConfidence, evidenceCoverage }) })
           send({ type: 'complete', processoId })
           return
         }
 
         // ─── Step 3: TOON Enrichment ─────────────────────
+        // topRanked só tem jurisprudência (DataJud, Pinecone, STJ CKAN) — LexML foi separado antes.
         const tToon = Date.now()
         const toonResults = enrichWithToon(topRanked)
-        console.log('[analyze] step toon', { reqId, ms: Date.now() - tToon })
+        console.log('[analyze] step toon', { reqId, ms: Date.now() - tToon, count: toonResults.length })
 
-        // Send results to client
         send({ type: 'results', results: toonResults })
 
-        // ─── Step 3b: Enviar CF/88, Bases Públicas e Código Penal (validados por RAG) ───────
+        // ─── Step 3b: CF/88, CP, Bases Públicas + rawLexmlItems sempre incluídos ──
         const [cfArticles, basesPublicas, codigoPenal] = await Promise.all([cfPromise, basesPublicasPromise, codigoPenalPromise])
-        const { cf: cfValidados, cp: cpValidados } = await validateLegislacaoComRag(texto, cfArticles, codigoPenal)
-        if (cfValidados.length > 0 || basesPublicas.length > 0 || cpValidados.length > 0) {
-          send({ type: 'metadata', data: { cf_articles: cfValidados, bases_publicas: basesPublicas, codigo_penal: cpValidados, gemini_quota_exceeded: geminiQuotaExceeded } as any })
+        const { cf: cfValidados, cp: cpValidados } = await validateLegislacaoComRag(textoParaIA, cfArticles, codigoPenal)
+
+        const basesPublicasComLexml = [...basesPublicas, ...lexmlToBases(rawLexmlItems)]
+        if (cfValidados.length > 0 || basesPublicasComLexml.length > 0 || cpValidados.length > 0) {
+          send({ type: 'metadata', data: { cf_articles: cfValidados, bases_publicas: basesPublicasComLexml, codigo_penal: cpValidados, gemini_quota_exceeded: geminiQuotaExceeded } as any })
         }
 
-        // ─── Step 4: Per-result streaming justification ──
+        // ─── Step 4: Per-result TOON justification (jurisprudência real, sem LexML) ──
         const toonPayloads = toonResults.map(r => r.toonData!).filter(Boolean)
         const toonXml = serializeToonForPrompt(toonPayloads)
         let llmRateLimited = false
@@ -711,6 +766,7 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
           try {
             const resultStart = Date.now()
             const numeroProcesso = result.toonData?.numeroProcesso || result.numero
+            const genJustif = trace.generation({ name: `justification-${result.id}`, model: aiModels.chat, input: { tribunal: result.tribunal, numero: numeroProcesso } })
             let rawJson: string
             let parsed: ReturnType<typeof parseJustificationJson>
             let fullText: string
@@ -756,7 +812,7 @@ Exemplo de justificativa conservadora (quando a aplicabilidade é limitada):
               const userPrompt = `Analise a relevância da jurisprudência #${toonResults.indexOf(result) + 1} do ${result.tribunal} (processo ${numeroProcesso}) para o seguinte caso e responda APENAS no JSON exigido:
 
 CASO ANALISADO:
-${texto.slice(0, 1500)}
+${textoParaIA.slice(0, 1500)}
 
 Campos esperados:
 - conclusao: síntese objetiva da relevância
@@ -793,6 +849,7 @@ Use no JSON os valores EXATOS: numero="${numeroProcesso}", relator e data como n
               }
             }
 
+            genJustif.end({ text: fullText! })
             send({
               type: 'justification',
               data: { id: result.id },
@@ -836,6 +893,14 @@ Use no JSON os valores EXATOS: numero="${numeroProcesso}", relator e data como n
             })
           }
         }
+
+        // Langfuse — scores de qualidade e fim do trace (fire-and-forget)
+        if (confidence) {
+          trace.score('retrieval_confidence', confidence.retrieval_confidence ?? 0)
+          trace.score('evidence_coverage',    confidence.evidence_coverage    ?? 0)
+          trace.score('generation_risk',      confidence.generation_risk      ?? 0)
+        }
+        trace.end({ processoId, results: topRanked?.length ?? 0, totalMs: Date.now() - startedAt })
 
         send({ type: 'complete', processoId })
         console.log('[analyze] complete', { reqId, totalMs: Date.now() - startedAt })

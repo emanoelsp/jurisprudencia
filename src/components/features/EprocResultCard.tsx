@@ -11,19 +11,52 @@ interface Props {
   onInsert: (text: string) => void
   streaming?: boolean
   justificativa?: string
+  dataFato?: string  // YYYY-MM-DD from processo.dataProtocolo
 }
 
-export default function EprocResultCard({ result, index, onInsert, streaming, justificativa }: Props) {
+const LEGISLACAO_FONTES = new Set(['lexml', 'cf_88', 'codigo_penal'])
+const TODAY = new Date().toISOString().slice(0, 10)
+
+function getVigenciaBadge(result: EprocResult, dataFato?: string) {
+  if (!LEGISLACAO_FONTES.has(result.fonte || '')) return null
+  if (!result.dataVigencia) return null
+
+  const revogacao = result.dataRevogacao && result.dataRevogacao !== '9999-12-31'
+    ? result.dataRevogacao
+    : null
+
+  if (revogacao && revogacao < TODAY) {
+    return { label: `Revogada em ${revogacao}`, cls: 'border-red-500/40 text-red-400 bg-red-500/10' }
+  }
+
+  if (!dataFato) {
+    return { label: 'Redação vigente', cls: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/8' }
+  }
+
+  if (result.dataVigencia > dataFato) {
+    return { label: 'Redação posterior ao fato', cls: 'border-amber-500/40 text-amber-400 bg-amber-500/10' }
+  }
+
+  return { label: 'Redação na data do fato', cls: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/8' }
+}
+
+export default function EprocResultCard({ result, index, onInsert, streaming, justificativa, dataFato }: Props) {
   const [expanded, setExpanded] = useState(index === 0)
 
   function buildInsertText() {
-    return `${result.tribunal} – ${result.numero}
-EMENTA: ${result.ementa}
-Relator: ${result.relator}, julgado em ${result.dataJulgamento}.`
+    const isLexml = result.fonte === 'lexml'
+    const header = isLexml
+      ? `[LexML${result.tribunal && result.tribunal !== 'LexML' ? ` – ${result.tribunal}` : ''}]`
+      : `${result.tribunal} – ${result.numero}`
+    const meta = !isLexml && (result.relator || result.dataJulgamento)
+      ? `\nRelator: ${result.relator || 'N/D'}, julgado em ${result.dataJulgamento || 'N/D'}.`
+      : ''
+    return `${header}\nEMENTA: ${result.ementa}${meta}`
   }
 
   const isLowConfidence = result.badge === 'baixa'
   const isHighConfidence = result.badge === 'alta'
+  const vigenciaBadge = getVigenciaBadge(result, dataFato)
 
   return (
     <div
@@ -62,6 +95,11 @@ Relator: ${result.relator}, julgado em ${result.dataJulgamento}.`
             {result.alreadyUsed && (
               <span className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/30 text-amber-300 bg-amber-500/10">
                 parecer já usado {result.usageCount ? `(${result.usageCount}x)` : ''}
+              </span>
+            )}
+            {vigenciaBadge && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full border ${vigenciaBadge.cls}`}>
+                {vigenciaBadge.label}
               </span>
             )}
           </div>

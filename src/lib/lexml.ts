@@ -26,6 +26,21 @@ const BROWSER_HEADERS: HeadersInit = {
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 }
 
+/**
+ * Normaliza datas do LexML para YYYY-MM-DD.
+ * Suporta: "YYYY-MM-DD", "DD/MM/YYYY", "YYYY" (→ YYYY-01-01).
+ */
+export function parseLexMLDate(raw: string): string {
+  if (!raw?.trim()) return ''
+  const br = raw.match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/)
+  if (br) return `${br[3]}-${br[2]}-${br[1]}`
+  const iso = raw.match(/\b(\d{4})-(\d{2})-(\d{2})\b/)
+  if (iso) return iso[0]
+  const y = raw.match(/\b(\d{4})\b/)
+  if (y) return `${y[1]}-01-01`
+  return ''
+}
+
 /** Constrói query CQL para busca por texto (padrão SRU/LexML, ex: dc.description any "termo") */
 function buildCqlQuery(queryText: string): string {
   const terms = queryText
