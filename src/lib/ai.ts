@@ -25,10 +25,6 @@ export const aiModels = {
     (activeProvider === 'gemini' ? 'gemini-embedding-001' : 'text-embedding-3-small'),
 }
 
-if (!geminiApiKey && !openAiApiKey) {
-  throw new Error('Missing API key. Set GEMINI_API_KEY (recommended) or OPENAI_API_KEY.')
-}
-
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 type ChatCompletionParams = {
@@ -171,6 +167,9 @@ async function tryOpenAiCompatibleChat(
  * Erros não recuperáveis propagam; falhas recuperáveis tentam o próximo.
  */
 export async function chatCompletionWithFallbacks(params: ChatCompletionParams): Promise<ChatCompletionResult> {
+  if (!geminiApiKey && !openAiApiKey && !groqApiKey && !openrouterApiKey) {
+    throw new Error('Missing API key. Set GEMINI_API_KEY (recommended) or OPENAI_API_KEY.')
+  }
   let lastErr: unknown
 
   if (geminiApiKey) {
