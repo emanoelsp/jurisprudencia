@@ -10,20 +10,26 @@ const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-playfair',
   display: 'swap',
+  preload: false,
+  fallback: ['Georgia', 'serif'],
 })
 
 const sourceSans = Source_Sans_3({
   subsets: ['latin'],
   variable: '--font-source',
   display: 'swap',
+  preload: false,
   weight: ['300', '400', '600', '700'],
+  fallback: ['system-ui', 'sans-serif'],
 })
 
 const jetbrains = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-jetbrains',
   display: 'swap',
+  preload: false,
   weight: ['400', '500'],
+  fallback: ['Menlo', 'monospace'],
 })
 
 export const metadata: Metadata = {
