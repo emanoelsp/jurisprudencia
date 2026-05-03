@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN
+    const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN
     if (!accessToken) return NextResponse.json({ ok: true })
 
     const body = await req.json().catch(() => ({}))
