@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase'
 import Link from 'next/link'
 import type { Processo } from '@/types'
 import { statusLabel, statusColor, formatDate, truncate } from '@/lib/utils'
-import { FileText, TrendingUp, CheckCircle, Clock, Plus, ArrowRight } from 'lucide-react'
+import { FileText, TrendingUp, CheckCircle, Clock, Plus, ArrowRight, Upload, Sparkles, PenLine } from 'lucide-react'
 import { SkeletonStats, SkeletonList } from '@/components/ui/Skeleton'
 
 export default function DashboardPage() {
@@ -58,7 +58,7 @@ export default function DashboardPage() {
   )
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6 lg:space-y-8 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8 animate-fade-in">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -107,29 +107,36 @@ export default function DashboardPage() {
         </div>
 
         {processos.length === 0 ? (
-          <div className="p-8 sm:p-12 text-center space-y-3">
-            <FileText size={36} className="text-brand-border mx-auto" />
-            <p className="font-body text-brand-slate text-sm">
-            Nenhum processo ainda. Que tal começar?
-            </p>
-            <div className="text-left space-y-3 mt-4 mb-4">
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-brand-indigo/20 text-brand-indigo text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
-                <p className="font-body text-brand-slate text-sm">Crie um processo e faça upload do PDF da peça</p>
+          <div className="p-6 sm:p-10">
+            <div className="max-w-xl mx-auto text-center mb-8">
+              <div className="w-14 h-14 rounded-2xl bg-brand-indigo/10 border border-brand-indigo/20 flex items-center justify-center mx-auto mb-4">
+                <Sparkles size={26} className="text-brand-indigo" />
               </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-brand-indigo/20 text-brand-indigo text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
-                <p className="font-body text-brand-slate text-sm">Clique em &quot;Analisar com JurisprudencIA&quot; para buscar jurisprudências</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-brand-indigo/20 text-brand-indigo text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
-                <p className="font-body text-brand-slate text-sm">Revise as sugestões, insira no editor e aprove</p>
-              </div>
+              <h3 className="font-display font-bold text-brand-cream text-lg mb-1">Bem-vindo à IURISPRUDENTIA</h3>
+              <p className="font-body text-brand-slate text-sm">Siga os 3 passos abaixo para gerar seu primeiro parecer com IA.</p>
             </div>
-            <Link href="/dashboard/processos" className="btn-primary inline-flex">
-              <Plus size={14} />
-              Adicionar primeiro processo
-            </Link>
+            <div className="grid sm:grid-cols-3 gap-4 mb-8">
+              {[
+                { icon: Upload,    step: '1', title: 'Crie um processo', desc: 'Preencha os dados e faça upload do PDF da peça processual.' },
+                { icon: Sparkles,  step: '2', title: 'Analise com IA',   desc: 'Clique em "Analisar com IURISPRUDENTIA" — buscamos jurisprudência, CF/88 e CP em segundos.' },
+                { icon: PenLine,   step: '3', title: 'Revise e aprove',  desc: 'Insira as sugestões no editor, ajuste o texto e aprove o parecer.' },
+              ].map(({ icon: Icon, step, title, desc }) => (
+                <div key={step} className="card p-5 space-y-3 border border-brand-indigo/10">
+                  <div className="flex items-center gap-3">
+                    <span className="w-7 h-7 rounded-full bg-brand-indigo/20 text-brand-indigo text-xs font-bold flex items-center justify-center flex-shrink-0">{step}</span>
+                    <Icon size={16} className="text-brand-indigo" />
+                  </div>
+                  <p className="font-body font-semibold text-brand-cream text-sm">{title}</p>
+                  <p className="font-body text-brand-slate text-xs leading-relaxed">{desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="text-center">
+              <Link href="/dashboard/processos" className="btn-primary inline-flex">
+                <Plus size={14} />
+                Criar primeiro processo
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="divide-y divide-brand-border">

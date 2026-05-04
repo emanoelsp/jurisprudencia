@@ -7,8 +7,6 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL
-
 interface IngestResult {
   ok?: boolean
   success?: boolean
@@ -22,7 +20,7 @@ interface IngestResult {
 }
 
 export default function AdminPage() {
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
 
   const [ingestRunning, setIngestRunning]   = useState(false)
   const [ingestResult, setIngestResult]     = useState<IngestResult | null>(null)
@@ -30,8 +28,7 @@ export default function AdminPage() {
   const [maxResources, setMaxResources]     = useState(3)
   const [dryRun, setDryRun]                 = useState(false)
 
-  // Restrict to admin email if configured
-  const isAdmin = !ADMIN_EMAIL || user?.email === ADMIN_EMAIL
+  const isAdmin = userData?.role === 'admin'
 
   async function runStjIngest() {
     setIngestRunning(true)
@@ -70,7 +67,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
 
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl bg-brand-indigo/15 border border-brand-indigo/25 flex items-center justify-center">

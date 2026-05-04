@@ -9,7 +9,7 @@ import Logo from '@/components/ui/Logo'
 import {
   LayoutDashboard, FileText, BookOpen,
   LogOut, ChevronRight, Crown, WalletCards,
-  Menu, X, Zap,
+  Menu, X, Zap, UserCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -19,6 +19,7 @@ const nav = [
   { href: '/dashboard/processos',           icon: FileText,        label: 'Processos',             admin: false },
   { href: '/dashboard/base-conhecimento',   icon: BookOpen,        label: 'Base de Conhecimento',  admin: false },
   { href: '/dashboard/planos',              icon: WalletCards,     label: 'Planos',                admin: false },
+  { href: '/dashboard/perfil',              icon: UserCircle,      label: 'Meu Perfil',            admin: false },
   { href: '/dashboard/admin',               icon: Zap,             label: 'Admin',                 admin: true  },
 ]
 
@@ -78,7 +79,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-0.5">
         {nav.map(({ href, icon: Icon, label, admin }) => {
-          if (admin && ADMIN_EMAIL && user?.email !== ADMIN_EMAIL) return null
+          if (admin && userData?.role !== 'admin') return null
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link

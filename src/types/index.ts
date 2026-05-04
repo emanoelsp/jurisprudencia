@@ -105,6 +105,7 @@ export interface User {
   email: string
   displayName?: string
   photoURL?: string
+  role?: 'admin' | 'cliente'
   plano: 'free' | 'plano1' | 'plano2' | 'escritorio' | 'start' | 'trial'
   planoStatus?: 'trialing' | 'active' | 'past_due' | 'canceled'
   trialEndsAt?: string

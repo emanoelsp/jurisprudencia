@@ -11,6 +11,8 @@
     "test:unit": "node --experimental-strip-types --test tests/unit-pii.test.js tests/unit-plans.test.js tests/unit-toon.test.js",
     "pinecone:create-index": "node scripts/create-pinecone-index.mjs",
     "test:gold": "node scripts/evaluate-gold.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "release:check": "npm run test:regression && npm run test:gold && npm run build"
   },
   "dependencies": {
@@ -38,6 +40,7 @@
     "react-dom": "^18.3.0",
     "react-dropzone": "^14.2.3",
     "react-hot-toast": "^2.4.1",
+    "resend": "^6.12.2",
     "tailwind-merge": "^2.4.0",
     "uuid": "^10.0.0"
   },

@@ -746,23 +746,11 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
           send({ type: 'metadata', data: { cf_articles: cfValidados, bases_publicas: basesPublicasComLexml, codigo_penal: cpValidados, gemini_quota_exceeded: geminiQuotaExceeded } as any })
         }
 
-        // ─── Step 4: Per-result TOON justification (jurisprudência real, sem LexML) ──
+        // ─── Step 4: Per-result TOON justification — paralelo, concorrência 3 ──
         const toonPayloads = toonResults.map(r => r.toonData!).filter(Boolean)
         const toonXml = serializeToonForPrompt(toonPayloads)
-        let llmRateLimited = false
 
-        for (const result of toonResults) {
-          if (llmRateLimited) {
-            const fallback = buildFallbackJustification({
-              numero: result.toonData?.numeroProcesso || result.numero,
-              tribunal: result.tribunal,
-              relator: result.relator,
-              dataJulgamento: result.dataJulgamento,
-              ementa: result.ementa,
-            })
-            send({ type: 'justification', data: { id: result.id }, text: fallback })
-            continue
-          }
+        const runJustification = async (result: typeof toonResults[0]) => {
           try {
             const resultStart = Date.now()
             const numeroProcesso = result.toonData?.numeroProcesso || result.numero
@@ -872,7 +860,6 @@ Use no JSON os valores EXATOS: numero="${numeroProcesso}", relator e data como n
           } catch (resultErr: any) {
             console.error('[analyze] result failed', { reqId, resultId: result.id, error: resultErr?.message || resultErr })
             if (resultErr?.status === 429) {
-              llmRateLimited = true
               const fallback = buildFallbackJustification({
                 numero: result.toonData?.numeroProcesso || result.numero,
                 tribunal: result.tribunal,
@@ -885,13 +872,19 @@ Use no JSON os valores EXATOS: numero="${numeroProcesso}", relator e data como n
                 type: 'error',
                 error: 'Limite temporário da IA atingido. Continuando em modo econômico para não interromper a análise.',
               })
-              continue
+              return
             }
             send({
               type: 'error',
               error: `Falha ao gerar justificativa do resultado ${result.id}: ${resultErr?.message || 'erro inesperado'}`,
             })
           }
+        }
+
+        // Executa justificativas em paralelo, lotes de 3
+        const CONCURRENCY = 3
+        for (let i = 0; i < toonResults.length; i += CONCURRENCY) {
+          await Promise.allSettled(toonResults.slice(i, i + CONCURRENCY).map(runJustification))
         }
 
         // Langfuse — scores de qualidade e fim do trace (fire-and-forget)

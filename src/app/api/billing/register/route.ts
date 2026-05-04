@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
 import { requireServerAuth } from '@/lib/server-auth'
 import { computeTrialEndsAt, normalizePlan, planForUserPlan } from '@/lib/plans'
+import { sendWelcomeEmail } from '@/lib/email'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
         uid: authUser.uid,
         email,
         displayName: displayName || undefined,
+        role: 'cliente',
         plano: selectedPlan,
         planoStatus: selectedPlan === 'free' ? 'trialing' : 'active',
         trialEndsAt: trialEndsAt || null,
@@ -64,6 +66,7 @@ export async function POST(req: NextRequest) {
         createdAt: now,
         updatedAt: now,
       })
+      sendWelcomeEmail(email, displayName || undefined).catch(() => {})
     } else {
       const current = userSnap.data() as any
       if (!current?.plano) {

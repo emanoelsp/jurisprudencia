@@ -14,7 +14,7 @@ import {
   Sparkles, Save, CheckCircle, AlertCircle,
   ArrowLeft, FileText, Loader2, Cpu,
   Shield, AlignLeft, Library, Database, Scale, BookOpen, Gavel, ChevronDown,
-  History, X, Expand, AlertTriangle,
+  History, X, Expand, AlertTriangle, Landmark,
 } from 'lucide-react'
 import { statusLabel, statusColor, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -57,7 +57,7 @@ export default function AnalisarPage() {
   const [toonValid, setToonValid]         = useState<boolean | null>(null)
   const [usedPareceres, setUsedPareceres] = useState<JurisprudenciaCriada[]>([])
   const [knowledgeBasePareceres, setKnowledgeBasePareceres] = useState<JurisprudenciaCriada[]>([])
-  const [leftTab, setLeftTab] = useState<'datajud' | 'bases_publicas' | 'codigo_penal' | 'constitucional' | 'pareceres'>('datajud')
+  const [leftTab, setLeftTab] = useState<'resultados' | 'tribunais' | 'bases_publicas' | 'codigo_penal' | 'constitucional' | 'pareceres'>('resultados')
   const [selectedTribunal, setSelectedTribunal] = useState('TJSP')
   const [tribunalDropdownOpen, setTribunalDropdownOpen] = useState(false)
   const tribunalDropdownRef = useRef<HTMLDivElement>(null)
@@ -435,8 +435,11 @@ export default function AnalisarPage() {
   const lexmlCount = results.filter(r => r.fonte === 'lexml').length
   const datajudLabel = `Resultados${stjCount > 0 ? ` · STJ(${stjCount})` : ''}${lexmlCount > 0 ? ` · LexML(${lexmlCount})` : ''}`
 
+  const totalResults = results.length + cfArticlesFromAnalysis.length + codigoPenalFromAnalysis.length + basesPublicasFromAnalysis.length
+
   const leftTabButtons = [
-    { key: 'datajud' as const, icon: Database, label: datajudLabel },
+    { key: 'resultados' as const, icon: Database, label: totalResults > 0 ? `Resultados (${totalResults})` : 'Resultados' },
+    { key: 'tribunais' as const, icon: Landmark, label: results.length > 0 ? `Tribunais (${results.length})` : 'Tribunais' },
     { key: 'bases_publicas' as const, icon: BookOpen, label: 'Bases' },
     { key: 'codigo_penal' as const, icon: Gavel, label: 'CP' },
     { key: 'constitucional' as const, icon: Scale, label: 'CF/88' },
@@ -621,17 +624,8 @@ export default function AnalisarPage() {
             {analyzing ? (
               <><Loader2 size={14} className="animate-spin" /> Analisando...</>
             ) : (
-              <><Sparkles size={14} /> Analisar com JurisprudencIA</>
+              <><Sparkles size={14} /> Analisar com IURISPRUDENTIA</>
             )}
-          </button>
-          <button
-            onClick={() => !isFreePlan && setShowExpandModal(true)}
-            disabled={analyzing || isFreePlan}
-            title={isFreePlan ? 'Faca upgrade para ampliar tribunais' : undefined}
-            className={`text-xs py-2 px-3 ${isFreePlan ? 'opacity-50 cursor-not-allowed btn-ghost' : 'btn-ghost'}`}
-          >
-            <Expand size={14} />
-            Ampliar tribunais
           </button>
           <button
             onClick={() => { setShowVersionsPanel(true); loadVersions() }}
@@ -807,17 +801,161 @@ export default function AnalisarPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
-            {leftTab === 'datajud' && (
+            {leftTab === 'resultados' && (
               <>
-                {results.length === 0 && !analyzing && (
+                {totalResults === 0 && !analyzing && (
                   <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-8 sm:py-12">
                     <div className="w-12 sm:w-14 h-12 sm:h-14 rounded-2xl bg-brand-indigo/10 border border-brand-indigo/20 flex items-center justify-center">
                       <Sparkles size={20} className="text-brand-indigo" />
                     </div>
                     <div>
-                      <p className="font-body font-semibold text-brand-cream text-sm">Pronto para analise</p>
+                      <p className="font-body font-semibold text-brand-cream text-sm">Pronto para análise</p>
                       <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
-                        Clique em &quot;Analisar&quot; para buscar em DataJud CNJ, LexML, STJ Dados Abertos e no seu acervo interno.
+                        Clique em &quot;Analisar com IURISPRUDENTIA&quot; para buscar jurisprudência, CF/88, Código Penal e legislação relevante ao processo.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {analyzing && totalResults === 0 && (
+                  <div className="space-y-3">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="card p-4 space-y-2 shimmer">
+                        <div className="h-4 bg-brand-border rounded w-3/4" />
+                        <div className="h-3 bg-brand-border rounded w-1/2" />
+                        <div className="h-3 bg-brand-border rounded w-full" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {analysisError && !analyzing && (
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/8 p-4 space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="font-body font-semibold text-amber-300 text-sm">Poucos precedentes encontrados</p>
+                        <p className="font-body text-amber-300/80 text-xs leading-relaxed">
+                          Não encontramos jurisprudência suficiente para este processo no tribunal selecionado. Tente ampliar o escopo ou enriquecer o texto do processo.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pl-6">
+                      <button onClick={() => startAnalysis()} className="btn-primary text-xs py-1.5 px-3">
+                        Tentar novamente
+                      </button>
+                      {!isFreePlan && (
+                        <button onClick={() => setShowExpandModal(true)} className="btn-ghost text-xs py-1.5 px-3">
+                          <Expand size={12} /> Ampliar tribunais
+                        </button>
+                      )}
+                    </div>
+                    {results.length > 0 && (
+                      <p className="font-body text-amber-300/60 text-[11px] pl-6">
+                        {results.length} resultado{results.length !== 1 ? 's' : ''} parcial encontrado{results.length !== 1 ? 's' : ''} abaixo.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {results.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-brand-slate/60">Jurisprudência — {results.length} resultado{results.length !== 1 ? 's' : ''}</p>
+                    {results.map((result, i) => (
+                      <div key={result.id} className="relative">
+                        <span className="absolute top-3 right-3 z-10 text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-brand-indigo/20 text-brand-indigo border border-brand-indigo/20 pointer-events-none">
+                          {result.fonte === 'stj_dados_abertos' ? 'STJ' : result.fonte === 'lexml' ? 'LexML' : 'DataJud'}
+                        </span>
+                        <EprocResultCard
+                          result={result}
+                          index={i}
+                          onInsert={insertText}
+                          streaming={streamingId === result.id}
+                          justificativa={justificativas[result.id]}
+                          dataFato={processo?.dataProtocolo}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {cfArticlesFromAnalysis.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-brand-slate/60">CF/88 — {cfArticlesFromAnalysis.length} artigo{cfArticlesFromAnalysis.length !== 1 ? 's' : ''}</p>
+                    {cfArticlesFromAnalysis.map(art => (
+                      <div key={art.id} className="card p-3 sm:p-4 space-y-2 border border-brand-gold/20">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-body text-sm font-semibold text-brand-cream">{art.titulo}</p>
+                          <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-brand-gold/15 text-brand-gold border border-brand-gold/20 flex-shrink-0">CF/88</span>
+                        </div>
+                        {art.aplicabilidade && <p className="font-body text-brand-gold text-xs italic">{art.aplicabilidade}</p>}
+                        {art.texto && <p className="font-body text-brand-slate text-xs line-clamp-2">{art.texto}</p>}
+                        <button onClick={() => insertText(`[${art.titulo}]\n${art.texto || ''}\n${art.aplicabilidade ? `Aplicabilidade: ${art.aplicabilidade}\n` : ''}\n`)} className="btn-ghost text-xs py-1.5 px-2">Inserir no editor</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {codigoPenalFromAnalysis.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-brand-slate/60">Código Penal — {codigoPenalFromAnalysis.length} artigo{codigoPenalFromAnalysis.length !== 1 ? 's' : ''}</p>
+                    {codigoPenalFromAnalysis.map(cp => (
+                      <div key={cp.id} className="card p-3 sm:p-4 space-y-2 border border-brand-indigo/20">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-body text-sm font-semibold text-brand-cream">{cp.fonte}</p>
+                          <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-brand-indigo/15 text-brand-indigo border border-brand-indigo/20 flex-shrink-0">CP</span>
+                        </div>
+                        <p className="font-body text-brand-slate text-xs line-clamp-2">{cp.ementa}</p>
+                        {cp.aplicabilidade && <p className="font-body text-brand-gold text-xs italic">{cp.aplicabilidade}</p>}
+                        <button onClick={() => insertText(`[${cp.fonte}]\n${cp.ementa}\n${cp.aplicabilidade ? `Aplicabilidade: ${cp.aplicabilidade}\n` : ''}\n`)} className="btn-ghost text-xs py-1.5 px-2">Inserir no editor</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {basesPublicasFromAnalysis.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-brand-slate/60">Bases & Súmulas — {basesPublicasFromAnalysis.length}</p>
+                    {basesPublicasFromAnalysis.map(bp => (
+                      <div key={bp.id} className="card p-3 sm:p-4 space-y-2 border border-emerald-500/20">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-body text-sm font-semibold text-brand-cream">{bp.fonte}</p>
+                          <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex-shrink-0">{bp.tipo}</span>
+                        </div>
+                        <p className="font-body text-brand-slate text-xs line-clamp-2">{bp.ementa}</p>
+                        {bp.aplicabilidade && <p className="font-body text-brand-gold text-xs italic">{bp.aplicabilidade}</p>}
+                        <button onClick={() => insertText(`[${bp.fonte}]\n${bp.ementa}\n${bp.aplicabilidade ? `Aplicabilidade: ${bp.aplicabilidade}\n` : ''}\n`)} className="btn-ghost text-xs py-1.5 px-2">Inserir no editor</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {leftTab === 'tribunais' && (
+              <>
+                {!isFreePlan && (
+                  <div className="flex justify-end mb-1">
+                    <button
+                      onClick={() => setShowExpandModal(true)}
+                      disabled={analyzing}
+                      className="btn-ghost text-xs py-1.5 px-3"
+                    >
+                      <Expand size={12} />
+                      Ampliar para todos os tribunais
+                    </button>
+                  </div>
+                )}
+
+                {results.length === 0 && !analyzing && (
+                  <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-8 sm:py-12">
+                    <div className="w-12 sm:w-14 h-12 sm:h-14 rounded-2xl bg-brand-indigo/10 border border-brand-indigo/20 flex items-center justify-center">
+                      <Landmark size={20} className="text-brand-indigo" />
+                    </div>
+                    <div>
+                      <p className="font-body font-semibold text-brand-cream text-sm">Resultados por tribunal</p>
+                      <p className="font-body text-brand-slate text-xs mt-1 max-w-xs">
+                        Após a análise, os resultados são agrupados por tribunal aqui.
                       </p>
                     </div>
                   </div>
@@ -835,25 +973,32 @@ export default function AnalisarPage() {
                   </div>
                 )}
 
-                {analysisError && !analyzing && (
-                  <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 space-y-2">
-                    <p className="font-body text-red-300 text-sm">{analysisError}</p>
-                    <button onClick={() => startAnalysis()} className="btn-primary text-xs py-1.5 px-3">
-                      Tentar novamente
-                    </button>
+                {Object.entries(
+                  results.reduce((acc, r) => {
+                    const t = r.tribunal || (r.fonte === 'stj_dados_abertos' ? 'STJ' : r.fonte === 'lexml' ? 'LexML' : 'DataJud CNJ')
+                    if (!acc[t]) acc[t] = []
+                    acc[t].push(r)
+                    return acc
+                  }, {} as Record<string, EprocResult[]>)
+                ).map(([tribunal, items]) => (
+                  <div key={tribunal} className="space-y-2 pb-2">
+                    <div className="flex items-center gap-2 sticky top-0 bg-brand-navy/95 backdrop-blur-sm py-1.5 z-10">
+                      <Landmark size={12} className="text-brand-indigo flex-shrink-0" />
+                      <p className="font-body text-xs font-semibold text-brand-cream">{tribunal}</p>
+                      <span className="bg-brand-indigo/20 text-brand-indigo text-[10px] px-1.5 py-0.5 rounded-full font-mono">{items.length}</span>
+                    </div>
+                    {items.map((result, i) => (
+                      <EprocResultCard
+                        key={result.id}
+                        result={result}
+                        index={i}
+                        onInsert={insertText}
+                        streaming={streamingId === result.id}
+                        justificativa={justificativas[result.id]}
+                        dataFato={processo?.dataProtocolo}
+                      />
+                    ))}
                   </div>
-                )}
-
-                {results.map((result, i) => (
-                  <EprocResultCard
-                    key={result.id}
-                    result={result}
-                    index={i}
-                    onInsert={insertText}
-                    streaming={streamingId === result.id}
-                    justificativa={justificativas[result.id]}
-                    dataFato={processo?.dataProtocolo}
-                  />
                 ))}
               </>
             )}
