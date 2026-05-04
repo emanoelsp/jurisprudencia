@@ -282,6 +282,19 @@ export default function ProcessosPage() {
     setSelectedIds(prev => prev.size === ids.length ? new Set() : new Set(ids))
   }
 
+  async function requestNotificationPermission() {
+    if (typeof Notification === 'undefined') return
+    if (Notification.permission === 'default') await Notification.requestPermission()
+  }
+
+  function sendBatchNotification(ok: number, errors: number) {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    const body = errors > 0
+      ? `${ok} analisado${ok !== 1 ? 's' : ''} · ${errors} erro${errors !== 1 ? 's' : ''}`
+      : `${ok} processo${ok !== 1 ? 's' : ''} analisado${ok !== 1 ? 's' : ''} com sucesso`
+    new Notification('Análise em lote concluída — IURISPRUDENTIA', { body, icon: '/favicon.ico' })
+  }
+
   async function handleBatchAnalysis() {
     if (!canBatch) {
       toast('Análise em lote requer plano Pro ou superior.', { icon: '🔒' })
@@ -289,6 +302,7 @@ export default function ProcessosPage() {
     }
     const ids = Array.from(selectedIds).slice(0, maxBatch)
     if (ids.length === 0) return
+    await requestNotificationPermission()
     setBatchRunning(true)
     setBatchResult(null)
     try {
@@ -302,6 +316,8 @@ export default function ProcessosPage() {
       if (!res.ok) throw new Error(data?.error || 'Falha na análise em lote')
       setBatchResult({ ok: data.ok, errors: data.errors, skipped: data.skipped })
       setSelectedIds(new Set())
+      sendBatchNotification(data.ok, data.errors)
+      toast.success(`Lote concluído: ${data.ok} analisado${data.ok !== 1 ? 's' : ''}`, { duration: 6000 })
       await loadProcessos()
     } catch (err: any) {
       toast.error(err.message || 'Erro na análise em lote.')
