@@ -179,7 +179,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   )
 
   return (
-    <div className="min-h-screen bg-brand-navy flex">
+    <div className="h-screen overflow-hidden bg-brand-navy flex">
 
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -189,10 +189,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
 
-      {/* Sidebar - desktop: fixed, mobile: slide-in */}
+      {/* Sidebar - always fixed, full height */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-brand-navylt border-r border-brand-border flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:z-auto',
+          'fixed inset-y-0 left-0 z-50 w-64 bg-brand-navylt border-r border-brand-border flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out overflow-y-auto lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -200,7 +200,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64 h-full overflow-hidden">
         {/* Mobile top bar */}
         <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-brand-navylt border-b border-brand-border flex-shrink-0">
           <button
@@ -218,7 +218,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto bg-grid">
+        <main className="flex-1 overflow-y-auto bg-grid">
           {children}
         </main>
       </div>
