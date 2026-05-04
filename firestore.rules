@@ -3,25 +3,51 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can only read/write their own data
+    // Users: own data only
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Processos: owner-only access
+    // Processos: owner-only
     match /processos/{processoId} {
       allow read, update, delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid;
+
+      // Versoes subcollection: owner of the parent processo only
+      match /versoes/{versaoId} {
+        allow read, write: if request.auth != null
+          && get(/databases/$(database)/documents/processos/$(processoId)).data.userId
+             == request.auth.uid;
+      }
     }
 
-    // Jurisprudencias: owner-only access
+    // Jurisprudencias: owner-only
     match /jurisprudencias/{jurId} {
       allow read, update, delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Templates: owner-only (also enforced server-side via adminDb)
+    match /templates/{templateId} {
+      allow read, update, delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // auditLog: write-only for authenticated users, read only server-side (adminDb bypasses rules)
+    match /auditLog/{entryId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false; // admin panel reads via adminDb
+    }
+
+    // admin_expenses: admin SDK only — never accessible from client
+    match /admin_expenses/{doc} {
+      allow read, write: if false;
     }
   }
 }

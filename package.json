@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test:regression": "node --test tests/regression-guards.test.js",
-    "test:unit": "node --experimental-strip-types --test tests/unit-pii.test.js tests/unit-plans.test.js tests/unit-toon.test.js",
+    "test:unit": "node --experimental-strip-types --test tests/unit-pii.test.js tests/unit-plans.test.js tests/unit-toon.test.js tests/unit-rag.test.js",
     "pinecone:create-index": "node scripts/create-pinecone-index.mjs",
     "test:gold": "node scripts/evaluate-gold.mjs",
     "test:e2e": "playwright test",
@@ -45,6 +45,7 @@
     "uuid": "^10.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^20.14.0",
     "@types/pdf-parse": "^1.1.4",
     "@types/react": "^18.3.0",

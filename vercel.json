@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/stj-ingest",
       "schedule": "0 4 * * 1"
+    },
+    {
+      "path": "/api/cron/stf-ingest",
+      "schedule": "0 5 * * 1"
     }
   ]
 }

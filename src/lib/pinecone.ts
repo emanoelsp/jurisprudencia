@@ -56,6 +56,14 @@ export async function queryPinecone(
   })
 }
 
+export async function deletePineconeByIds(ids: string[], namespaceOverride?: string) {
+  if (ids.length === 0) return
+  const index = getPineconeIndex(namespaceOverride)
+  if (!index) return
+  // SDK v7: deleteMany expects { ids } object, not a plain array
+  await index.deleteMany({ ids })
+}
+
 export async function upsertPinecone(vectors: PineconeVector[], namespaceOverride?: string) {
   if (vectors.length === 0) return { upsertedCount: 0 }
   const index = getPineconeIndex(namespaceOverride)

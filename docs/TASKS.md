@@ -54,23 +54,27 @@
 ## Goals por semana
 
 ### Semana atual (2026-05-04 →)
-- [ ] **Provider Pattern** — `src/lib/providers/` com wrappers finos em volta dos libs existentes (`datajud`, `lexml`, `pinecone-public`, `pinecone-user`, `stj`, `cf88`, `codigo-penal`)
-- [ ] **`multiSourceSearch()` + `groupByTab()`** — orquestrador em `src/lib/orchestrator.ts`; substitui o `searchHybrid` como entry point do `/api/analyze`
-- [ ] **LLM em paralelo** — `Promise.allSettled` com concorrência 3 nos `justification-{id}` em `analyze/route.ts`
+- [x] **Provider Pattern** — `src/lib/providers/` com orchestrator + tab-config
+- [x] **`multiSourceSearch()` + `groupByTab()`** — orquestrador em `src/lib/orchestrator.ts`
+- [x] **LLM em paralelo** — `Promise.allSettled` com concorrência 3 nos `justification-{id}` em `analyze/route.ts`
 
-### Semana 2 (2026-05-11 →)
-- [ ] **Abas dinâmicas por `natureza`** — `src/lib/providers/tab-config.ts`; aba CP para processos criminais, CLT para trabalhistas
-- [ ] **Curadoria Camada 3** — mapear 10 leis frequentes (CP, CF/88 emendas principais, CDC, CLT) com URNs e datas de vigência históricas; ingerir via `/api/admin/lexml-historical-ingest`
+### Semana 2 (2026-05-04 → concluído)
+- [x] **Abas dinâmicas por `natureza`** — `src/lib/providers/tab-config.ts`; CP reordenado para processos criminais
+- [x] **Análise em lote** — `POST /api/analyze/batch` + UI com checkboxes em processos (Pro+, batchSize por plano)
+- [x] **Log de auditoria** — `src/lib/audit.ts` + `GET /api/admin/audit-log` + painel admin (Escritório+)
+- [x] **Restaurar versão de parecer** — botão "Restaurar esta versão" no histórico carrega HTML no editor
+- [x] **Curadoria Camada 3** — mapear 10 leis frequentes (CP, CF/88 emendas, CDC, CLT) com URNs e datas históricas; ingerir via `/api/admin/lexml-batch-ingest`
 
-### Semana 3 (2026-05-18 →)
-- [ ] **Testes E2E (Playwright)** — upload PDF → análise completa → inserir no editor → salvar parecer (alta prioridade: cada deploy é um risco sem cobertura)
+### Fase 3 (2026-05-04 → concluído)
+- [x] **Templates personalizados** — `GET/POST/DELETE /api/templates` + `/dashboard/templates` + seletor no analisar + 4 modelos prontos para importar (Pro+)
+- [x] **Dashboard do escritório** — `/dashboard/escritorio` + `GET /api/escritorio/stats`: KPIs, uso diário, membros por escritorio, atividade recente (Escritório+)
+- [x] **Alertas de quota / Saúde das APIs** — `GET /api/admin/health`: verifica todas as env vars críticas, painel com status por serviço no admin
+- [x] **Testes E2E (Playwright)** — `tests/e2e/fixtures.ts` com helper `loginAs` + fixture `loggedInPage`; cobertura: auth, dashboard, processos, planos, templates, perfil, base de conhecimento
 
 ### Backlog (sem prazo)
-- [ ] **Testes unitários — rag.ts**: `chunkText`, RRF, `calculateEvidenceCoverage` (requer mock de Pinecone/Cohere)
-- [ ] **Dashboard do escritório**: plano Escritório precisa de visão agregada de uso por membro
-- [ ] **Alertas de quota**: notificar quando Gemini/Cohere estiver próximo do limite (painel admin)
-- [ ] **Restaurar versão de parecer**: botão "Restaurar" que carrega HTML da versão no editor
-- [ ] **STF provider offline**: ingestão via cron, mesmo padrão do STJ CKAN
+- [x] **Curadoria Camada 3** — `src/lib/lexml-curacao.ts` com 10 leis (CP, CF/88, CDC, CLT, CC, CPC, CPP, LIA, Maria da Penha, ECA). Batch ingest via `POST /api/admin/lexml-batch-ingest` + botão no painel admin.
+- [x] **Testes unitários — rag.ts** — `chunkText`, `fuseWithRRF`, `scoreToBadge`, `dedupeEprocResults` em `tests/unit-rag.test.js` (22 testes). Funções puras extraídas para `src/lib/rag-pure.ts`. Total: 61 testes unitários.
+- [x] **STF provider offline** — `src/lib/providers/stf-provider.ts` (DataJud CNJ) + `POST /api/admin/stf-ingest` + `GET /api/cron/stf-ingest` (cron seg 05:00 UTC) + seção no painel admin.
 
 ---
 

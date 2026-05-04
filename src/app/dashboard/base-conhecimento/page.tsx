@@ -224,7 +224,10 @@ export default function BaseConhecimentoPage() {
             <span className="w-2 h-2 rounded-full bg-brand-gold" />
             Edicao Manual do Advogado
           </p>
-          <p className="font-body text-brand-slate text-sm leading-relaxed whitespace-pre-wrap">{selected.edicaoManual}</p>
+          <div
+            className="ProseMirror font-body text-sm"
+            dangerouslySetInnerHTML={{ __html: selected.edicaoManual }}
+          />
         </div>
       )}
 

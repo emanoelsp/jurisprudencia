@@ -9,21 +9,21 @@ import Logo from '@/components/ui/Logo'
 import {
   LayoutDashboard, FileText, BookOpen,
   LogOut, ChevronRight, Crown, WalletCards,
-  Menu, X, Zap, UserCircle,
+  Menu, X, Zap, UserCircle, LayoutTemplate, Building2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
 const nav = [
-  { href: '/dashboard',                     icon: LayoutDashboard, label: 'Visão Geral',           admin: false },
-  { href: '/dashboard/processos',           icon: FileText,        label: 'Processos',             admin: false },
-  { href: '/dashboard/base-conhecimento',   icon: BookOpen,        label: 'Base de Conhecimento',  admin: false },
-  { href: '/dashboard/planos',              icon: WalletCards,     label: 'Planos',                admin: false },
-  { href: '/dashboard/perfil',              icon: UserCircle,      label: 'Meu Perfil',            admin: false },
-  { href: '/dashboard/admin',               icon: Zap,             label: 'Admin',                 admin: true  },
+  { href: '/dashboard',                     icon: LayoutDashboard, label: 'Visão Geral',           admin: false, requireTemplates: false, requireEscritorio: false },
+  { href: '/dashboard/processos',           icon: FileText,        label: 'Processos',             admin: false, requireTemplates: false, requireEscritorio: false },
+  { href: '/dashboard/base-conhecimento',   icon: BookOpen,        label: 'Base de Conhecimento',  admin: false, requireTemplates: false, requireEscritorio: false },
+  { href: '/dashboard/templates',           icon: LayoutTemplate,  label: 'Templates',             admin: false, requireTemplates: true,  requireEscritorio: false },
+  { href: '/dashboard/escritorio',          icon: Building2,       label: 'Escritório',            admin: false, requireTemplates: false, requireEscritorio: true  },
+  { href: '/dashboard/planos',              icon: WalletCards,     label: 'Planos',                admin: false, requireTemplates: false, requireEscritorio: false },
+  { href: '/dashboard/perfil',              icon: UserCircle,      label: 'Meu Perfil',            admin: false, requireTemplates: false, requireEscritorio: false },
+  { href: '/dashboard/admin',               icon: Zap,             label: 'Admin',                 admin: true,  requireTemplates: false, requireEscritorio: false },
 ]
-
-const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, userData, loading, signOut } = useAuth()
@@ -78,8 +78,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-0.5">
-        {nav.map(({ href, icon: Icon, label, admin }) => {
+        {nav.map(({ href, icon: Icon, label, admin, requireTemplates, requireEscritorio }) => {
           if (admin && userData?.role !== 'admin') return null
+          const plan = planForUserPlan(normalizePlan(userData?.plano))
+          if (requireTemplates && !plan.limits.allowCustomTemplates) return null
+          const planId = normalizePlan(userData?.plano)
+          if (requireEscritorio && planId !== 'escritorio' && planId !== 'start') return null
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link
@@ -149,7 +153,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
         )}
 
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-navy/50">
+        <Link
+          href="/dashboard/perfil"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-navy/50 hover:bg-brand-navy transition-colors"
+        >
           <div className="w-8 h-8 rounded-full bg-brand-indigo/20 border border-brand-indigo/30 flex items-center justify-center text-brand-indigo font-semibold text-xs flex-shrink-0">
             {(userData?.displayName || user.email || 'U')[0].toUpperCase()}
           </div>
@@ -159,7 +166,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </p>
             <p className="text-[11px] text-brand-slate truncate">{user.email}</p>
           </div>
-        </div>
+        </Link>
 
         <div className="flex gap-1.5">
           <button onClick={handleSignOut} className="btn-ghost flex-1 text-xs py-2 px-2 justify-center">

@@ -12,6 +12,14 @@ export type PlanPolicy = {
     allowExpandTribunais: boolean
     allowPriorityQueue: boolean
     allowAdvancedRerank: boolean
+    allowExport: boolean
+    allowBatchAnalysis: boolean
+    allowCustomTemplates: boolean
+    allowAuditLog: boolean
+    allowWhiteLabel: boolean
+    allowApiAccess: boolean
+    versionHistoryDays: number   // 0 = sem histórico, -1 = ilimitado
+    batchSize: number            // máximo de processos em lote (0 = desabilitado)
   }
   perks: string[]
 }
@@ -29,6 +37,14 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
       allowExpandTribunais: false,
       allowPriorityQueue: false,
       allowAdvancedRerank: false,
+      allowExport: false,
+      allowBatchAnalysis: false,
+      allowCustomTemplates: false,
+      allowAuditLog: false,
+      allowWhiteLabel: false,
+      allowApiAccess: false,
+      versionHistoryDays: 7,
+      batchSize: 0,
     },
     perks: [
       'Teste por 7 dias',
@@ -46,11 +62,21 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
       allowExpandTribunais: true,
       allowPriorityQueue: true,
       allowAdvancedRerank: true,
+      allowExport: true,
+      allowBatchAnalysis: false,
+      allowCustomTemplates: false,
+      allowAuditLog: false,
+      allowWhiteLabel: false,
+      allowApiAccess: false,
+      versionHistoryDays: 30,
+      batchSize: 0,
     },
     perks: [
       'Expandir tribunais',
       'Rerank avançado',
       'Fila prioritária',
+      'Export PDF e Word',
+      'Histórico 30 dias',
     ],
   },
   plano2: {
@@ -64,11 +90,23 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
       allowExpandTribunais: true,
       allowPriorityQueue: true,
       allowAdvancedRerank: true,
+      allowExport: true,
+      allowBatchAnalysis: true,
+      allowCustomTemplates: true,
+      allowAuditLog: false,
+      allowWhiteLabel: false,
+      allowApiAccess: true,
+      versionHistoryDays: 365,
+      batchSize: 5,
     },
     perks: [
       'Maior volume diário',
       'Expandir tribunais',
       'Rerank avançado',
+      'Análise em lote (5 processos)',
+      'Templates personalizados',
+      'Histórico 12 meses',
+      'Acesso à API',
     ],
   },
   escritorio: {
@@ -82,11 +120,24 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
       allowExpandTribunais: true,
       allowPriorityQueue: true,
       allowAdvancedRerank: true,
+      allowExport: true,
+      allowBatchAnalysis: true,
+      allowCustomTemplates: true,
+      allowAuditLog: true,
+      allowWhiteLabel: true,
+      allowApiAccess: true,
+      versionHistoryDays: -1,
+      batchSize: 20,
     },
     perks: [
       'Até 6 usuários',
       'Base compartilhada',
       'Suporte prioritário',
+      'Análise em lote (20 processos)',
+      'Log de auditoria',
+      'White-label (logo do escritório)',
+      'Histórico ilimitado',
+      'Acesso à API',
     ],
   },
   start: {
@@ -100,11 +151,24 @@ export const PLAN_POLICIES: Record<PlanId, PlanPolicy> = {
       allowExpandTribunais: true,
       allowPriorityQueue: true,
       allowAdvancedRerank: true,
+      allowExport: true,
+      allowBatchAnalysis: true,
+      allowCustomTemplates: true,
+      allowAuditLog: true,
+      allowWhiteLabel: true,
+      allowApiAccess: true,
+      versionHistoryDays: -1,
+      batchSize: 0,
     },
     perks: [
       'Plano customizado',
       'Onboarding dedicado',
       'SLA comercial',
+      'Integrações (e-proc, SAJ, PJe)',
+      'Análise em lote ilimitada',
+      'Success manager dedicado',
+      'Histórico ilimitado',
+      'API ilimitada',
     ],
   },
 }

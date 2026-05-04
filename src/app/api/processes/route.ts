@@ -4,7 +4,7 @@ import { adminDb } from '@/lib/firebase-admin'
 import { requireServerAuth } from '@/lib/server-auth'
 import { normalizePlan, planForUserPlan, todayDateKey } from '@/lib/plans'
 import { chunkText, generateEmbedding } from '@/lib/rag'
-import { upsertPinecone } from '@/lib/pinecone'
+import { upsertPinecone, deletePineconeByIds } from '@/lib/pinecone'
 import { namespaceForUser } from '@/lib/tenant'
 
 export const runtime = 'nodejs'
@@ -225,6 +225,14 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     await ref.delete()
+
+    // Remove vectors from user's private Pinecone namespace (non-blocking)
+    const namespace = namespaceForUser(authUser.uid)
+    const vectorIds = Array.from({ length: 6 }, (_, i) => `${id}::proc::${i}`)
+    deletePineconeByIds(vectorIds, namespace).catch(e =>
+      console.warn('[processes] pinecone delete failed (non-blocking)', e)
+    )
+
     return NextResponse.json({ success: true })
   } catch (err: any) {
     if (String(err?.message || '').startsWith('UNAUTHORIZED:')) {

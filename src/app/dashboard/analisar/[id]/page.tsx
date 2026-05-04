@@ -1,11 +1,14 @@
 'use client'
 // src/app/dashboard/analisar/[id]/page.tsx
-import { useEffect, useState, useRef, useCallback } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { doc, getDoc, updateDoc, collection, addDoc, getDocs, orderBy, query as fsQuery, limit as fsLimit } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/lib/auth-context'
-import { normalizePlan } from '@/lib/plans'
+import { normalizePlan, planForUserPlan } from '@/lib/plans'
+import { exportToPdf, exportToWord } from '@/lib/export'
+import { getTabsForNatureza } from '@/lib/providers/tab-config'
+import type { AnalysisTemplate } from '@/types'
 import type { Processo, EprocResult, AnalysisChunk, JurisprudenciaCriada } from '@/types'
 import EprocResultCard from '@/components/features/EprocResultCard'
 import { SkeletonList, SkeletonLine } from '@/components/ui/Skeleton'
@@ -14,7 +17,7 @@ import {
   Sparkles, Save, CheckCircle, AlertCircle,
   ArrowLeft, FileText, Loader2, Cpu,
   Shield, AlignLeft, Library, Database, Scale, BookOpen, Gavel, ChevronDown,
-  History, X, Expand, AlertTriangle, Landmark,
+  History, X, Expand, AlertTriangle, Landmark, FileDown, FileText as FileWord, PlusCircle,
 } from 'lucide-react'
 import { statusLabel, statusColor, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -44,6 +47,8 @@ export default function AnalisarPage() {
   const router    = useRouter()
   const { user, userData }  = useAuth()
   const isFreePlan = normalizePlan(userData?.plano) === 'free'
+  const plan = planForUserPlan(userData?.plano)
+  const canExport = plan.limits.allowExport
 
   const [processo, setProcesso]           = useState<Processo | null>(null)
   const [loading, setLoading]             = useState(true)
@@ -76,9 +81,11 @@ export default function AnalisarPage() {
   const [mobilePanel, setMobilePanel] = useState<'results' | 'editor'>('results')
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [showVersionsPanel, setShowVersionsPanel] = useState(false)
-  const [versions, setVersions] = useState<Array<{ id: string; savedAt: string; type: 'draft' | 'approved'; preview: string }>>([])
+  const [versions, setVersions] = useState<Array<{ id: string; savedAt: string; type: 'draft' | 'approved'; preview: string; content?: string }>>([])
   const [loadingVersions, setLoadingVersions] = useState(false)
   const [showExpandModal, setShowExpandModal] = useState(false)
+  const [templates, setTemplates] = useState<AnalysisTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
 
   const INITIAL_AGENT_STEPS: Array<{ label: string; done: boolean }> = [
     { label: 'Analisei o texto do processo para extrair tema, pedidos e causa de pedir.', done: false },
@@ -108,6 +115,14 @@ export default function AnalisarPage() {
   useEffect(() => {
     if (!user) return
     loadKnowledgeBase()
+    if (plan.limits.allowCustomTemplates) {
+      getAuthHeaders().then(headers =>
+        fetch('/api/templates', { headers })
+          .then(r => r.json())
+          .then(d => setTemplates(d.templates || []))
+          .catch(() => {})
+      )
+    }
   }, [user?.uid, loadKnowledgeBase])
 
   useEffect(() => {
@@ -182,6 +197,7 @@ export default function AnalisarPage() {
           tribunal: isFreePlan ? (processo.tribunal || 'TODOS') : selectedTribunal,
           expandScope: isFreePlan ? false : !!options?.expandScope,
           dataProtocolo: processo.dataProtocolo || '',
+          ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}),
         }),
         signal: abortRef.current.signal,
       })
@@ -325,10 +341,15 @@ export default function AnalisarPage() {
   async function loadVersions() {
     setLoadingVersions(true)
     try {
+      const histDays = plan.limits.versionHistoryDays
       const versaoRef = collection(db, 'processos', id, 'versoes')
-      const q = fsQuery(versaoRef, orderBy('savedAt', 'desc'), fsLimit(10))
+      const q = fsQuery(versaoRef, orderBy('savedAt', 'desc'), fsLimit(histDays === -1 ? 100 : histDays === 0 ? 1 : Math.min(histDays * 2, 50)))
       const snap = await getDocs(q)
-      setVersions(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })))
+      const cutoff = histDays > 0 ? new Date(Date.now() - histDays * 86400_000).toISOString() : null
+      const filtered = snap.docs
+        .map(d => ({ id: d.id, ...(d.data() as any) }))
+        .filter((v: any) => !cutoff || v.savedAt >= cutoff)
+      setVersions(filtered)
     } catch (err) {
       console.error('[versoes] load failed', err)
     } finally {
@@ -437,14 +458,23 @@ export default function AnalisarPage() {
 
   const totalResults = results.length + cfArticlesFromAnalysis.length + codigoPenalFromAnalysis.length + basesPublicasFromAnalysis.length
 
-  const leftTabButtons = [
-    { key: 'resultados' as const, icon: Database, label: totalResults > 0 ? `Resultados (${totalResults})` : 'Resultados' },
-    { key: 'tribunais' as const, icon: Landmark, label: results.length > 0 ? `Tribunais (${results.length})` : 'Tribunais' },
-    { key: 'bases_publicas' as const, icon: BookOpen, label: 'Bases' },
-    { key: 'codigo_penal' as const, icon: Gavel, label: 'CP' },
-    { key: 'constitucional' as const, icon: Scale, label: 'CF/88' },
-    { key: 'pareceres' as const, icon: Library, label: 'Pareceres' },
-  ]
+  const TAB_ICONS: Record<string, React.ElementType> = {
+    resultados: Database,
+    tribunais: Landmark,
+    bases_publicas: BookOpen,
+    codigo_penal: Gavel,
+    constitucional: Scale,
+    pareceres: Library,
+  }
+  const leftTabButtons = getTabsForNatureza(processo?.natureza).map(t => ({
+    key: t.id as typeof leftTab,
+    icon: TAB_ICONS[t.id] ?? Database,
+    label: t.id === 'resultados' && totalResults > 0
+      ? `Resultados (${totalResults})`
+      : t.id === 'tribunais' && results.length > 0
+      ? `Tribunais (${results.length})`
+      : t.label,
+  }))
 
   const avgConfidence = results.length
     ? Math.round(
@@ -616,6 +646,20 @@ export default function AnalisarPage() {
 
         {/* Desktop actions */}
         <div className="hidden md:flex items-center gap-2">
+          {plan.limits.allowCustomTemplates && templates.length > 0 && (
+            <select
+              value={selectedTemplateId}
+              onChange={e => setSelectedTemplateId(e.target.value)}
+              disabled={analyzing}
+              className="input text-xs py-1.5 px-2 min-w-0 max-w-[160px] bg-brand-navy border-brand-border text-brand-cream"
+              title="Template de análise"
+            >
+              <option value="">Sem template</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          )}
           <button
             onClick={() => startAnalysis()}
             disabled={analyzing}
@@ -634,6 +678,32 @@ export default function AnalisarPage() {
           >
             <History size={14} />
           </button>
+          {canExport ? (
+            <>
+              <button
+                onClick={() => exportToPdf(editorRef.current?.getHTML() ?? editorContent, `${processo?.cliente || 'Parecer'} — ${processo?.numero || ''}`)}
+                className="btn-ghost text-xs py-2 px-2"
+                title="Exportar PDF"
+              >
+                <FileDown size={14} />
+              </button>
+              <button
+                onClick={() => exportToWord(editorRef.current?.getHTML() ?? editorContent, `${processo?.cliente || 'Parecer'} — ${processo?.numero || ''}`)}
+                className="btn-ghost text-xs py-2 px-2"
+                title="Exportar Word (.doc)"
+              >
+                <FileWord size={14} />
+              </button>
+            </>
+          ) : (
+            <button
+              title="Export disponível a partir do plano Starter"
+              className="btn-ghost text-xs py-2 px-2 opacity-40 cursor-not-allowed"
+              onClick={() => toast('Export disponível no plano Starter ou superior.')}
+            >
+              <FileDown size={14} />
+            </button>
+          )}
           <button onClick={() => handleSave(false)} disabled={saving} className="btn-ghost text-xs py-2 px-3">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Salvar
@@ -881,16 +951,18 @@ export default function AnalisarPage() {
 
                 {cfArticlesFromAnalysis.length > 0 && (
                   <div className="space-y-2 pt-1">
-                    <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-brand-slate/60">CF/88 — {cfArticlesFromAnalysis.length} artigo{cfArticlesFromAnalysis.length !== 1 ? 's' : ''}</p>
+                    <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-brand-slate/60">Constituição Federal — {cfArticlesFromAnalysis.length} artigo{cfArticlesFromAnalysis.length !== 1 ? 's' : ''}</p>
                     {cfArticlesFromAnalysis.map(art => (
-                      <div key={art.id} className="card p-3 sm:p-4 space-y-2 border border-brand-gold/20">
-                        <div className="flex items-center justify-between gap-2">
+                      <div key={art.id} className="card p-4 space-y-3 border border-brand-gold/20">
+                        <div className="flex items-start justify-between gap-2">
                           <p className="font-body text-sm font-semibold text-brand-cream">{art.titulo}</p>
                           <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-brand-gold/15 text-brand-gold border border-brand-gold/20 flex-shrink-0">CF/88</span>
                         </div>
                         {art.aplicabilidade && <p className="font-body text-brand-gold text-xs italic">{art.aplicabilidade}</p>}
-                        {art.texto && <p className="font-body text-brand-slate text-xs line-clamp-2">{art.texto}</p>}
-                        <button onClick={() => insertText(`[${art.titulo}]\n${art.texto || ''}\n${art.aplicabilidade ? `Aplicabilidade: ${art.aplicabilidade}\n` : ''}\n`)} className="btn-ghost text-xs py-1.5 px-2">Inserir no editor</button>
+                        {art.texto && <p className="font-body text-brand-slate text-xs leading-relaxed line-clamp-3">{art.texto}</p>}
+                        <button onClick={() => insertText(`[${art.titulo}]\n${art.texto || ''}\n${art.aplicabilidade ? `Aplicabilidade: ${art.aplicabilidade}\n` : ''}\n`)} className="btn-gold w-full justify-center text-xs py-2">
+                          <PlusCircle size={13} /> Inserir no Editor
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -900,14 +972,16 @@ export default function AnalisarPage() {
                   <div className="space-y-2 pt-1">
                     <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-brand-slate/60">Código Penal — {codigoPenalFromAnalysis.length} artigo{codigoPenalFromAnalysis.length !== 1 ? 's' : ''}</p>
                     {codigoPenalFromAnalysis.map(cp => (
-                      <div key={cp.id} className="card p-3 sm:p-4 space-y-2 border border-brand-indigo/20">
-                        <div className="flex items-center justify-between gap-2">
+                      <div key={cp.id} className="card p-4 space-y-3 border border-brand-indigo/20">
+                        <div className="flex items-start justify-between gap-2">
                           <p className="font-body text-sm font-semibold text-brand-cream">{cp.fonte}</p>
                           <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-brand-indigo/15 text-brand-indigo border border-brand-indigo/20 flex-shrink-0">CP</span>
                         </div>
-                        <p className="font-body text-brand-slate text-xs line-clamp-2">{cp.ementa}</p>
                         {cp.aplicabilidade && <p className="font-body text-brand-gold text-xs italic">{cp.aplicabilidade}</p>}
-                        <button onClick={() => insertText(`[${cp.fonte}]\n${cp.ementa}\n${cp.aplicabilidade ? `Aplicabilidade: ${cp.aplicabilidade}\n` : ''}\n`)} className="btn-ghost text-xs py-1.5 px-2">Inserir no editor</button>
+                        <p className="font-body text-brand-slate text-xs leading-relaxed line-clamp-3">{cp.ementa}</p>
+                        <button onClick={() => insertText(`[${cp.fonte}]\n${cp.ementa}\n${cp.aplicabilidade ? `Aplicabilidade: ${cp.aplicabilidade}\n` : ''}\n`)} className="btn-gold w-full justify-center text-xs py-2">
+                          <PlusCircle size={13} /> Inserir no Editor
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -917,14 +991,16 @@ export default function AnalisarPage() {
                   <div className="space-y-2 pt-1">
                     <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-brand-slate/60">Bases & Súmulas — {basesPublicasFromAnalysis.length}</p>
                     {basesPublicasFromAnalysis.map(bp => (
-                      <div key={bp.id} className="card p-3 sm:p-4 space-y-2 border border-emerald-500/20">
-                        <div className="flex items-center justify-between gap-2">
+                      <div key={bp.id} className="card p-4 space-y-3 border border-emerald-500/20">
+                        <div className="flex items-start justify-between gap-2">
                           <p className="font-body text-sm font-semibold text-brand-cream">{bp.fonte}</p>
                           <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex-shrink-0">{bp.tipo}</span>
                         </div>
-                        <p className="font-body text-brand-slate text-xs line-clamp-2">{bp.ementa}</p>
                         {bp.aplicabilidade && <p className="font-body text-brand-gold text-xs italic">{bp.aplicabilidade}</p>}
-                        <button onClick={() => insertText(`[${bp.fonte}]\n${bp.ementa}\n${bp.aplicabilidade ? `Aplicabilidade: ${bp.aplicabilidade}\n` : ''}\n`)} className="btn-ghost text-xs py-1.5 px-2">Inserir no editor</button>
+                        <p className="font-body text-brand-slate text-xs leading-relaxed line-clamp-3">{bp.ementa}</p>
+                        <button onClick={() => insertText(`[${bp.fonte}]\n${bp.ementa}\n${bp.aplicabilidade ? `Aplicabilidade: ${bp.aplicabilidade}\n` : ''}\n`)} className="btn-gold w-full justify-center text-xs py-2">
+                          <PlusCircle size={13} /> Inserir no Editor
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -1006,25 +1082,25 @@ export default function AnalisarPage() {
             {leftTab === 'bases_publicas' && (
               <div className="space-y-3">
                 {basesPublicasFromAnalysis.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <p className="font-body text-xs font-semibold text-brand-gold">
-                      Bases publicas -- legislacao, sumulas, jurisprudencia consolidada
+                      Bases públicas — legislação, súmulas e jurisprudência consolidada
                     </p>
                     {basesPublicasFromAnalysis.map(bp => (
-                      <div key={bp.id} className="card p-3 sm:p-4 space-y-2 border border-brand-indigo/20">
+                      <div key={bp.id} className="card p-4 space-y-3 border border-brand-indigo/20">
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-body text-sm font-semibold text-brand-cream">{bp.fonte}</p>
                           <span className="badge-media text-[10px] flex-shrink-0">{bp.tipo}</span>
                         </div>
-                        <p className="font-body text-brand-slate text-xs line-clamp-3">{bp.ementa}</p>
+                        <p className="font-body text-brand-slate text-xs leading-relaxed line-clamp-3">{bp.ementa}</p>
                         {bp.aplicabilidade && (
                           <p className="font-body text-brand-gold text-xs italic">{bp.aplicabilidade}</p>
                         )}
                         <button
                           onClick={() => insertText(`[${bp.fonte}]\n${bp.ementa}\n${bp.aplicabilidade ? `Aplicabilidade: ${bp.aplicabilidade}\n` : ''}\n`)}
-                          className="btn-ghost text-xs py-1.5 px-2"
+                          className="btn-gold w-full justify-center text-xs py-2"
                         >
-                          Inserir no editor
+                          <PlusCircle size={13} /> Inserir no Editor
                         </button>
                       </div>
                     ))}
@@ -1035,7 +1111,7 @@ export default function AnalisarPage() {
                       <BookOpen size={24} className="text-brand-indigo" />
                     </div>
                     <div>
-                      <p className="font-body font-semibold text-brand-cream text-sm">Bases publicas</p>
+                      <p className="font-body font-semibold text-brand-cream text-sm">Bases públicas</p>
                       {geminiQuotaExceeded ? (
                         <p className="font-body text-amber-400 text-xs mt-1">
                           Limite da API Gemini atingido. Aguarde alguns minutos ou verifique billing em <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev</a>.
@@ -1063,25 +1139,25 @@ export default function AnalisarPage() {
             {leftTab === 'codigo_penal' && (
               <div className="space-y-3">
                 {codigoPenalFromAnalysis.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <p className="font-body text-xs font-semibold text-brand-gold">
-                      Artigos do Codigo Penal aplicaveis ao processo (IA analisou o processo e o CP)
+                      Código Penal — artigos aplicáveis ao processo
                     </p>
                     {codigoPenalFromAnalysis.map(cp => (
-                      <div key={cp.id} className="card p-3 sm:p-4 space-y-2 border border-brand-indigo/20">
+                      <div key={cp.id} className="card p-4 space-y-3 border border-brand-indigo/20">
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-body text-sm font-semibold text-brand-cream">{cp.fonte}</p>
                           <span className="badge-media text-[10px] flex-shrink-0">{cp.tipo}</span>
                         </div>
-                        <p className="font-body text-brand-slate text-xs line-clamp-3">{cp.ementa}</p>
+                        <p className="font-body text-brand-slate text-xs leading-relaxed line-clamp-3">{cp.ementa}</p>
                         {cp.aplicabilidade && (
                           <p className="font-body text-brand-gold text-xs italic">{cp.aplicabilidade}</p>
                         )}
                         <button
                           onClick={() => insertText(`[${cp.fonte}]\n${cp.ementa}\n${cp.aplicabilidade ? `Aplicabilidade: ${cp.aplicabilidade}\n` : ''}\n`)}
-                          className="btn-ghost text-xs py-1.5 px-2"
+                          className="btn-gold w-full justify-center text-xs py-2"
                         >
-                          Inserir no editor
+                          <PlusCircle size={13} /> Inserir no Editor
                         </button>
                       </div>
                     ))}
@@ -1092,7 +1168,7 @@ export default function AnalisarPage() {
                       <Gavel size={24} className="text-brand-indigo" />
                     </div>
                     <div>
-                      <p className="font-body font-semibold text-brand-cream text-sm">Codigo Penal</p>
+                      <p className="font-body font-semibold text-brand-cream text-sm">Código Penal</p>
                       {geminiQuotaExceeded ? (
                         <p className="font-body text-amber-400 text-xs mt-1 max-w-xs">
                           Limite da API Gemini atingido. Aguarde alguns minutos ou verifique billing em <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev</a>.
@@ -1117,22 +1193,22 @@ export default function AnalisarPage() {
             {leftTab === 'constitucional' && (
               <div className="space-y-3">
                 {cfArticlesFromAnalysis.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <p className="font-body text-xs font-semibold text-brand-gold">
-                      Artigos da CF/88 aplicaveis ao processo (IA analisou o processo e a Constituicao)
+                      Constituição Federal — artigos aplicáveis ao processo
                     </p>
                     {cfArticlesFromAnalysis.map(art => (
-                      <div key={art.id} className="card p-3 sm:p-4 space-y-2 border border-brand-gold/30">
+                      <div key={art.id} className="card p-4 space-y-3 border border-brand-gold/30">
                         <p className="font-body text-sm font-semibold text-brand-cream">{art.titulo}</p>
                         {art.aplicabilidade && (
                           <p className="font-body text-brand-gold text-xs italic">{art.aplicabilidade}</p>
                         )}
-                        {art.texto && <p className="font-body text-brand-slate text-xs line-clamp-3">{art.texto}</p>}
+                        {art.texto && <p className="font-body text-brand-slate text-xs leading-relaxed line-clamp-3">{art.texto}</p>}
                         <button
                           onClick={() => insertText(`[${art.titulo}]\n${art.texto || ''}\n${art.aplicabilidade ? `Aplicabilidade: ${art.aplicabilidade}\n` : ''}\n`)}
-                          className="btn-ghost text-xs py-1.5 px-2"
+                          className="btn-gold w-full justify-center text-xs py-2"
                         >
-                          Inserir no editor
+                          <PlusCircle size={13} /> Inserir no Editor
                         </button>
                       </div>
                     ))}
@@ -1143,7 +1219,7 @@ export default function AnalisarPage() {
                       <Scale size={24} className="text-brand-gold" />
                     </div>
                     <div>
-                      <p className="font-body font-semibold text-brand-cream text-sm">Artigos da CF/88 aplicaveis</p>
+                      <p className="font-body font-semibold text-brand-cream text-sm">Constituição Federal — artigos aplicáveis</p>
                       {geminiQuotaExceeded ? (
                         <p className="font-body text-amber-400 text-xs mt-1 max-w-xs">
                           Limite da API Gemini atingido. Aguarde alguns minutos ou verifique billing em <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev</a>.
@@ -1184,7 +1260,7 @@ export default function AnalisarPage() {
                   <>
                     <p className="font-body text-xs font-semibold text-brand-gold">Jurisprudências já usadas (sua base)</p>
                     {knowledgeBasePareceres.map((item, idx) => (
-                      <div key={`${item.id}-${idx}`} className="card p-4 space-y-2">
+                      <div key={`${item.id}-${idx}`} className="card p-4 space-y-3">
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-body text-sm font-semibold text-brand-cream truncate">
                             {item.tribunal} — {item.numero}
@@ -1193,7 +1269,7 @@ export default function AnalisarPage() {
                             usado {item.usageCount || item.processoIds?.length || 1}x
                           </span>
                         </div>
-                        <p className="font-body text-brand-slate text-xs line-clamp-3">{item.ementa}</p>
+                        <p className="font-body text-brand-slate text-xs leading-relaxed line-clamp-3">{item.ementa}</p>
                         <button
                           onClick={() =>
                             insertText(
@@ -1202,9 +1278,9 @@ export default function AnalisarPage() {
                               }, julgado em ${item.dataJulgamento || 'N/D'}.`,
                             )
                           }
-                          className="btn-ghost text-xs py-1.5 px-2"
+                          className="btn-gold w-full justify-center text-xs py-2"
                         >
-                          Inserir no editor
+                          <PlusCircle size={13} /> Inserir no Editor
                         </button>
                       </div>
                     ))}
@@ -1330,15 +1406,15 @@ export default function AnalisarPage() {
                   )}
                   <button
                     onClick={() => {
-                      if (editorRef.current) {
-                        // Load version content into editor — requires getting full content
-                        // For now, show a toast; full restore would need content field
-                        toast('Para restaurar, copie o conteudo da versao manualmente.', { icon: 'ℹ️' })
-                      }
+                      if (!v.content) { toast.error('Conteúdo não disponível nesta versão.'); return }
+                      editorRef.current?.setHTML(v.content)
+                      setEditorContent(v.content)
+                      setShowVersionsPanel(false)
+                      toast.success('Versão restaurada no editor.')
                     }}
-                    className="btn-ghost text-xs py-1 px-2 w-full justify-center"
+                    className="btn-gold w-full justify-center text-xs py-1.5"
                   >
-                    Ver esta versao
+                    Restaurar esta versão
                   </button>
                 </div>
               ))}

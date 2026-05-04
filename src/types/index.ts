@@ -115,6 +115,17 @@ export interface User {
   createdAt: string
 }
 
+export interface AnalysisTemplate {
+  id: string
+  userId: string
+  name: string
+  description?: string
+  /** Appended to the justification system prompt — e.g. "Foque em danos morais e nexo causal." */
+  focusInstructions: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface FormularioProcesso {
   numero: string
   cliente: string

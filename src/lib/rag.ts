@@ -243,7 +243,7 @@ const RRF_K = 60 // Reciprocal Rank Fusion constant
  * score(d) = Σ 1/(k + rank(d)) para cada lista onde d aparece.
  * Crucial para fusão keyword (DataJud) + vetorial (Pinecone).
  */
-function fuseWithRRF(
+export function fuseWithRRF(
   listA: EprocResult[],
   listB: EprocResult[],
   k = RRF_K

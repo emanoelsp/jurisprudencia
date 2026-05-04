@@ -11,13 +11,14 @@ import type { Processo, FormularioProcesso } from '@/types'
 import { statusLabel, statusColor, formatDate } from '@/lib/utils'
 import {
   Upload, FileText, Search, Plus, Loader2,
-  CheckCircle, X, ArrowRight, Sparkles, Download, Trash2, AlertTriangle,
+  CheckCircle, X, ArrowRight, Sparkles, Download, Trash2, AlertTriangle, Layers,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import Link from 'next/link'
 import { v4 as uuidv4 } from 'uuid'
+import { planForUserPlan, normalizePlan } from '@/lib/plans'
 
 const emptyForm: FormularioProcesso = {
   numero: '', cliente: '', natureza: '', vara: '', tribunal: '', dataProtocolo: '',
@@ -26,8 +27,11 @@ const STORAGE_UPLOAD_TIMEOUT_MS = 90_000
 const STORAGE_URL_TIMEOUT_MS = 20_000
 
 export default function ProcessosPage() {
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const router   = useRouter()
+  const plan = planForUserPlan(normalizePlan(userData?.plano))
+  const canBatch = plan.limits.allowBatchAnalysis
+  const maxBatch = plan.limits.batchSize === 0 ? Infinity : plan.limits.batchSize
 
   const [processos, setProcessos]   = useState<Processo[]>([])
   const [loading, setLoading]       = useState(true)
@@ -44,6 +48,9 @@ export default function ProcessosPage() {
   const [deletePhraseInput, setDeletePhraseInput] = useState('')
   const [deleteNumeroInput, setDeleteNumeroInput] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchRunning, setBatchRunning] = useState(false)
+  const [batchResult, setBatchResult] = useState<{ ok: number; errors: number; skipped: number } | null>(null)
 
   function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
     return Promise.race([
@@ -263,6 +270,46 @@ export default function ProcessosPage() {
     }
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll(ids: string[]) {
+    setSelectedIds(prev => prev.size === ids.length ? new Set() : new Set(ids))
+  }
+
+  async function handleBatchAnalysis() {
+    if (!canBatch) {
+      toast('Análise em lote requer plano Pro ou superior.', { icon: '🔒' })
+      return
+    }
+    const ids = Array.from(selectedIds).slice(0, maxBatch)
+    if (ids.length === 0) return
+    setBatchRunning(true)
+    setBatchResult(null)
+    try {
+      const token = await user?.getIdToken()
+      const res = await fetch('/api/analyze/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ processoIds: ids }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Falha na análise em lote')
+      setBatchResult({ ok: data.ok, errors: data.errors, skipped: data.skipped })
+      setSelectedIds(new Set())
+      await loadProcessos()
+    } catch (err: any) {
+      toast.error(err.message || 'Erro na análise em lote.')
+    } finally {
+      setBatchRunning(false)
+    }
+  }
+
   const filtered = processos.filter(p =>
     p.numero?.toLowerCase().includes(search.toLowerCase()) ||
     p.cliente?.toLowerCase().includes(search.toLowerCase()) ||
@@ -290,11 +337,38 @@ export default function ProcessosPage() {
             {processos.length} processo{processos.length !== 1 ? 's' : ''} cadastrado{processos.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary self-start sm:self-auto">
-          <Plus size={16} />
-          Novo Processo
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={handleBatchAnalysis}
+              disabled={batchRunning || !canBatch}
+              title={!canBatch ? 'Requer plano Pro ou superior' : `Analisar ${Math.min(selectedIds.size, maxBatch)} processo(s)`}
+              className={`btn-gold text-sm ${!canBatch ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {batchRunning ? <Loader2 size={15} className="animate-spin" /> : <Layers size={15} />}
+              {batchRunning ? 'Analisando...' : `Analisar lote (${Math.min(selectedIds.size, maxBatch)})`}
+            </button>
+          )}
+          <button onClick={() => setShowModal(true)} className="btn-primary">
+            <Plus size={16} />
+            Novo Processo
+          </button>
+        </div>
       </div>
+
+      {/* Batch result */}
+      {batchResult && (
+        <div className="card p-4 border-emerald-500/30 bg-emerald-500/5 flex items-center justify-between gap-3">
+          <p className="font-body text-sm text-brand-cream">
+            Análise em lote concluída — <span className="text-emerald-400 font-semibold">{batchResult.ok} analisado{batchResult.ok !== 1 ? 's' : ''}</span>
+            {batchResult.errors > 0 && <span className="text-red-400 ml-2">{batchResult.errors} erro{batchResult.errors !== 1 ? 's' : ''}</span>}
+            {batchResult.skipped > 0 && <span className="text-brand-slate ml-2">{batchResult.skipped} ignorado{batchResult.skipped !== 1 ? 's' : ''}</span>}
+          </p>
+          <button onClick={() => setBatchResult(null)} className="text-brand-slate hover:text-brand-cream">
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
@@ -324,6 +398,15 @@ export default function ProcessosPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-brand-border">
+                    <th className="pl-5 pr-2 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        className="rounded border-brand-border bg-brand-navy accent-brand-indigo cursor-pointer"
+                        checked={selectedIds.size > 0 && selectedIds.size === filtered.length}
+                        onChange={() => toggleSelectAll(filtered.map(p => p.id))}
+                        title="Selecionar todos"
+                      />
+                    </th>
                     {['Numero CNJ', 'Cliente', 'Natureza', 'Status', 'Data', ''].map(h => (
                       <th key={h} className="px-5 py-3 text-left font-body text-xs font-semibold text-brand-slate uppercase tracking-wider">
                         {h}
@@ -333,7 +416,15 @@ export default function ProcessosPage() {
                 </thead>
                 <tbody className="divide-y divide-brand-border">
                   {filtered.map(p => (
-                    <tr key={p.id} className="hover:bg-brand-navy/40 transition-colors group">
+                    <tr key={p.id} className={`hover:bg-brand-navy/40 transition-colors group ${selectedIds.has(p.id) ? 'bg-brand-indigo/5' : ''}`}>
+                      <td className="pl-5 pr-2 py-4">
+                        <input
+                          type="checkbox"
+                          className="rounded border-brand-border bg-brand-navy accent-brand-indigo cursor-pointer"
+                          checked={selectedIds.has(p.id)}
+                          onChange={() => toggleSelect(p.id)}
+                        />
+                      </td>
                       <td className="px-5 py-4">
                         <span className="font-mono text-xs text-brand-cream">{p.numero || '--'}</span>
                       </td>
@@ -391,11 +482,19 @@ export default function ProcessosPage() {
             {/* Mobile card list */}
             <div className="md:hidden divide-y divide-brand-border">
               {filtered.map(p => (
-                <div key={p.id} className="p-4 space-y-3">
+                <div key={p.id} className={`p-4 space-y-3 ${selectedIds.has(p.id) ? 'bg-brand-indigo/5' : ''}`}>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-body text-sm font-semibold text-brand-cream truncate">{p.cliente}</p>
-                      <p className="font-mono text-[11px] text-brand-slate mt-0.5 truncate">{p.numero || '--'}</p>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <input
+                        type="checkbox"
+                        className="rounded border-brand-border bg-brand-navy accent-brand-indigo cursor-pointer flex-shrink-0"
+                        checked={selectedIds.has(p.id)}
+                        onChange={() => toggleSelect(p.id)}
+                      />
+                      <div className="min-w-0">
+                        <p className="font-body text-sm font-semibold text-brand-cream truncate">{p.cliente}</p>
+                        <p className="font-mono text-[11px] text-brand-slate mt-0.5 truncate">{p.numero || '--'}</p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <span className={`status-dot ${statusColor(p.status)}`} />

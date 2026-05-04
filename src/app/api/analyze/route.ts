@@ -30,6 +30,7 @@ import { extractCausaPetendi } from '@/lib/tools/extract-causa-petendi'
 import type { AnalysisChunk } from '@/types'
 import { sanitizePii } from '@/lib/pii'
 import { createTrace } from '@/lib/langfuse'
+import { writeAuditLog } from '@/lib/audit'
 
 function parseBasesPublicasResponse(raw: string): Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }> {
   const toonResults = parseToonBasesPublicas(raw)
@@ -356,7 +357,7 @@ export async function POST(req: NextRequest) {
     return new Response(err?.message || 'Invalid request', { status: 400 })
   }
 
-  const { processoId, texto, topResults, minConfidence, tribunal, expandScope, dataProtocolo } = payload
+  const { processoId, texto, topResults, minConfidence, tribunal, expandScope, dataProtocolo, templateId } = payload
   const dataFato = typeof dataProtocolo === 'string' && dataProtocolo.match(/^\d{4}-\d{2}-\d{2}$/) ? dataProtocolo : ''
   const topResultsLimit = resolveTopResults(topResults)
   const minConfidenceScore = resolveMinConfidence(minConfidence)
@@ -370,6 +371,17 @@ export async function POST(req: NextRequest) {
   if (shouldExpandScope && !plan.limits.allowExpandTribunais) {
     return new Response('Seu plano atual não inclui "Ampliar tribunais". Faça upgrade para habilitar.', { status: 402 })
   }
+  // Load custom template if provided (Pro+)
+  let templateFocusInstructions = ''
+  if (templateId && plan.limits.allowCustomTemplates) {
+    try {
+      const tSnap = await db.collection('templates').doc(String(templateId)).get()
+      if (tSnap.exists && (tSnap.data() as any).userId === authUser.uid) {
+        templateFocusInstructions = (tSnap.data() as any).focusInstructions || ''
+      }
+    } catch { /* non-critical */ }
+  }
+
   const clientNamespace = namespaceForUser(authUser.uid)
   const effectiveTopResultsLimit = shouldExpandScope
     ? Math.min(topResultsLimit, EXPANDED_SCOPE_TOP_RESULTS)
@@ -401,6 +413,11 @@ export async function POST(req: NextRequest) {
 
   // LGPD: sanitize PII before any third-party LLM call; keep raw texto for local ops (TOON, scoring)
   const textoParaIA = sanitizePii(texto)
+
+  // Audit log — fire-and-forget
+  if (plan.limits.allowAuditLog) {
+    writeAuditLog({ userId: authUser.uid, action: 'analysis_run', processoId, meta: { plan: plan.name } })
+  }
 
   // Observabilidade — fire-and-forget, nunca bloqueia o pipeline
   const trace = createTrace({
@@ -767,7 +784,7 @@ NUNCA escreva texto livre. Resposta = tokens TOON. Máximo 5 blocos ⟨CF⟩...�
                   ? `REPETIÇÃO OBRIGATÓRIA - COPIE E COLE os valores exatos abaixo. Número do processo (use EXATAMENTE no JSON): ${numeroProcesso}\nRelator: ${result.relator}\nTribunal: ${result.tribunal}\nData: ${result.dataJulgamento}\n\n`
                   : ''
 
-              const systemPrompt = `${strictPrefix}Você é um especialista em direito brasileiro com profundo conhecimento em jurisprudência. Você auxilia o advogado; a decisão final e a responsabilidade profissional são sempre do advogado.
+              const systemPrompt = `${strictPrefix}Você é um especialista em direito brasileiro com profundo conhecimento em jurisprudência. Você auxilia o advogado; a decisão final e a responsabilidade profissional são sempre do advogado.${templateFocusInstructions ? `\n\nINSTRUÇÕES ADICIONAIS DO TEMPLATE:\n${templateFocusInstructions}` : ''}
 
 ${toonXml}
 

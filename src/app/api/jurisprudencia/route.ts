@@ -4,6 +4,8 @@ import { adminDb } from '@/lib/firebase-admin'
 import type { JurisprudenciaCriada } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 import { requireServerAuth } from '@/lib/server-auth'
+import { writeAuditLog } from '@/lib/audit'
+import { planForUserPlan, normalizePlan } from '@/lib/plans'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -75,6 +77,13 @@ export async function POST(req: NextRequest) {
     }
 
     await db.collection('jurisprudencias').doc(jurisprudencia.id).set(jurisprudencia)
+
+    // Audit log (fire-and-forget for Escritório+ plans)
+    const userSnap = await db.collection('users').doc(authUser.uid).get()
+    const plan = planForUserPlan(normalizePlan((userSnap.data() as any)?.plano))
+    if (plan.limits.allowAuditLog) {
+      writeAuditLog({ userId: authUser.uid, action: 'parecer_approved', processoId, processoNumero: result.numero })
+    }
 
     return NextResponse.json({ success: true, id: jurisprudencia.id })
 

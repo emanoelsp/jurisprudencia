@@ -17,6 +17,7 @@ export interface LegalEditorRef {
   getText: () => string
   getWordCount: () => number
   isEmpty: () => boolean
+  setHTML: (html: string) => void
 }
 
 interface Props {
@@ -47,6 +48,7 @@ const LegalEditor = forwardRef<LegalEditorRef, Props>(
         CharacterCount,
       ],
       content: initialContent || undefined,
+      immediatelyRender: false,
       editorProps: {
         attributes: { class: 'focus:outline-none' },
       },
@@ -82,6 +84,7 @@ const LegalEditor = forwardRef<LegalEditorRef, Props>(
         return t ? t.split(/\s+/).length : 0
       },
       isEmpty: () => editor?.isEmpty ?? true,
+      setHTML: (html: string) => editor?.commands.setContent(html),
     }), [editor])
 
     // Load Firestore content after editor mounts (only if editor is still empty)
