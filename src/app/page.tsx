@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import Logo from '@/components/ui/Logo'
-import { Eye, EyeOff, ArrowRight, Scale, Shield, BookOpen, BarChart3, ChevronRight } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, Scale, Shield, BookOpen, BarChart3, ChevronRight, Layers, LayoutTemplate, Building2 } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import toast from 'react-hot-toast'
 import type { PlanId } from '@/lib/plans'
@@ -135,18 +135,18 @@ export default function HomePage() {
                 <span className="text-brand-gold italic">Direito.</span>
               </h1>
               <p className="font-body text-brand-slate text-base xl:text-lg leading-relaxed max-w-md">
-                Analise jurisprudencial com inteligência artificial para fundamentar
-                teses, mapear tendências e antecipar decisões com precisão.
+                Do upload do processo ao parecer fundamentado em segundos — com busca
+                em DataJud, CF/88, Código Penal e base privada do escritório.
               </p>
             </div>
 
             {/* Feature Pillars */}
             <div className="grid grid-cols-2 gap-4">
               {[
-                { icon: Scale, label: 'Pesquisa Inteligente', desc: 'Padrões e probabilidades extraídos de milhares de decisões' },
-                { icon: Shield, label: 'Segurança Jurídica', desc: 'Fundamentação embasada em dados reais dos tribunais' },
-                { icon: BookOpen, label: 'Base de Conhecimento', desc: 'Acervo curado de jurisprudência organizado por matéria' },
-                { icon: BarChart3, label: 'Análise Estratégica', desc: 'Mapeamento por tribunal, câmara e julgador' },
+                { icon: Shield, label: 'Anti-alucinação (TOON)', desc: 'Números CNJ e ementas verificados por hash — nenhum dado inventado pelo modelo.' },
+                { icon: Layers, label: 'Análise em lote', desc: 'Analise múltiplos processos de uma vez com prioridade no plano Pro.' },
+                { icon: LayoutTemplate, label: 'Templates personalizados', desc: 'Crie modelos de parecer para cada área do direito e reuse em segundos.' },
+                { icon: Building2, label: 'Dashboard do escritório', desc: 'KPIs, uso diário e gestão de membros para escritórios e equipes.' },
               ].map(({ icon: Icon, label, desc }, i) => (
                 <div
                   key={label}
@@ -167,9 +167,9 @@ export default function HomePage() {
               className={`flex items-center gap-8 xl:gap-12 pt-2 transition-all duration-700 delay-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
             >
               {[
-                { val: '50K', suf: '+', label: 'Decisões analisadas' },
-                { val: '97', suf: '%', label: 'Precisão na pesquisa' },
-                { val: '12', suf: '', label: 'Tribunais cobertos' },
+                { val: '90+', suf: '', label: 'Tribunais cobertos' },
+                { val: '<30', suf: 's', label: 'Upload ao parecer' },
+                { val: '100', suf: '%', label: 'Rastreabilidade' },
               ].map(({ val, suf, label }) => (
                 <div key={label} className="space-y-1">
                   <AnimatedStat value={val} suffix={suf} />
