@@ -72,11 +72,11 @@
 - [x] **Testes E2E (Playwright)** — `tests/e2e/fixtures.ts` com helper `loginAs` + fixture `loggedInPage`; cobertura: auth, dashboard, processos, planos, templates, perfil, base de conhecimento
 
 ### Backlog — Sprint atual (2026-05-04 →)
-- [ ] **#1 Compartilhamento de pareceres** — link público com expiração (7 dias), sem login, só leitura. `POST /api/shares` + `GET /api/shares/[token]` + `/share/[token]` + botão no analisar.
-- [ ] **#2 Notificação ao terminar análise em lote** — toast em tempo real via Firestore listener + e-mail opcional (Resend) quando batch termina (Pro+).
-- [ ] **#3 Filtros avançados nos processos** — filtrar por tribunal, natureza, data de protocolo e status da análise na página de processos.
-- [ ] **#4 Landing page atualizada** — screenshots reais, CTAs atualizados (templates, batch, escritório), copy revisado.
-- [ ] **#5 Exportar parecer para Word (.docx)** — via `docx` npm + botão no LegalEditor ao lado do PDF.
+- [x] **#1 Compartilhamento de pareceres** — `POST /api/shares` + `GET /api/shares/[token]` + `/share/[token]` + botão Share2 no analisar (clipboard automático, válido 7 dias).
+- [x] **#2 Notificação ao terminar análise em lote** — Web Notifications API nativa (sem serviço externo): solicita permissão ao iniciar batch, dispara notificação do browser ao concluir + toast 6s.
+- [x] **#3 Filtros avançados nos processos** — filtro por tribunal, natureza e status; valores derivados dos próprios processos; indicador visual quando ativo; "Limpar filtros" com 1 clique.
+- [x] **#4 Landing page atualizada** — pilares: TOON, batch, templates, escritório; stats: 90+ tribunais, <30s end-to-end, 100% rastreabilidade; copy do hero mais específico.
+- [x] **#5 Exportar parecer para .docx** — reescrito com Word Open XML namespace, margens ABNT (30/25/25/35mm), Times New Roman 12pt, MIME type `application/vnd.openxmlformats-officedocument.wordprocessingml.document`. Abre no Word 2007+ e LibreOffice sem conversão.
 
 ### Backlog (sem prazo)
 - [x] **Curadoria Camada 3** — `src/lib/lexml-curacao.ts` com 10 leis (CP, CF/88, CDC, CLT, CC, CPC, CPP, LIA, Maria da Penha, ECA). Batch ingest via `POST /api/admin/lexml-batch-ingest` + botão no painel admin.
