@@ -103,44 +103,106 @@ export function exportToPdf(html: string, title: string): void {
 }
 
 export function exportToWord(html: string, title: string): void {
-  const wordHtml = `
+  const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+  const safeTitle = title.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  // Word Open XML namespace — opens natively in Word 2007+ and LibreOffice
+  const wordHtml = `<!DOCTYPE html>
 <html xmlns:o='urn:schemas-microsoft-com:office:office'
       xmlns:w='urn:schemas-microsoft-com:office:word'
       xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
   <meta charset="UTF-8">
-  <title>${title}</title>
-  <!--[if gte mso 9]>
-  <xml><w:WordDocument><w:View>Print</w:View><w:Zoom>90</w:Zoom></w:WordDocument></xml>
-  <![endif]-->
+  <title>${safeTitle}</title>
+  <!--[if gte mso 9]><xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml><![endif]-->
   <style>
-    body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000; }
-    h1, h2, h3 { font-family: Arial, sans-serif; }
-    p { margin-bottom: 8pt; text-align: justify; }
-    blockquote { margin-left: 40pt; }
+    @page Section1 {
+      size: 210mm 297mm;
+      margin: 30mm 25mm 25mm 35mm; /* ABNT NBR 14724 */
+      mso-page-orientation: portrait;
+    }
+    div.Section1 { page: Section1; }
+    body {
+      font-family: 'Times New Roman', serif;
+      font-size: 12pt;
+      line-height: 1.5;
+      color: #000;
+      background: #fff;
+    }
+    .doc-header {
+      border-bottom: 2pt solid #000;
+      padding-bottom: 8pt;
+      margin-bottom: 18pt;
+    }
+    .doc-header h1 {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #000;
+      margin: 0 0 4pt 0;
+    }
+    .doc-header p {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9pt;
+      color: #555;
+      margin: 0;
+    }
+    .doc-content h1 { font-family: Arial, sans-serif; font-size: 14pt; font-weight: bold; margin: 18pt 0 6pt; }
+    .doc-content h2 { font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold; margin: 14pt 0 5pt; }
+    .doc-content h3 { font-family: Arial, sans-serif; font-size: 12pt; font-weight: bold; font-style: italic; margin: 12pt 0 4pt; }
+    .doc-content p { margin-bottom: 8pt; text-align: justify; orphans: 2; widows: 2; }
+    .doc-content ul, .doc-content ol { padding-left: 24pt; margin-bottom: 8pt; }
+    .doc-content li { margin-bottom: 3pt; text-align: justify; }
+    .doc-content strong { font-weight: bold; }
+    .doc-content em { font-style: italic; }
+    .doc-content blockquote {
+      margin: 10pt 0 10pt 40pt;
+      padding-left: 12pt;
+      border-left: 3pt solid #aaa;
+      font-size: 11pt;
+      color: #333;
+    }
+    .doc-footer {
+      border-top: 1pt solid #ccc;
+      margin-top: 24pt;
+      padding-top: 8pt;
+      font-family: Arial, sans-serif;
+      font-size: 8pt;
+      color: #888;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
-  <h2 style="font-family:Arial;font-size:11pt;border-bottom:1pt solid #000;padding-bottom:6pt;">
-    IURISPRUDENTIA — Parecer Jurídico
-  </h2>
-  <p style="font-family:Arial;font-size:9pt;color:#666;">
-    ${title} · Gerado em ${new Date().toLocaleDateString('pt-BR')}
-  </p>
-  <br>
-  ${html}
-  <br><hr>
-  <p style="font-family:Arial;font-size:8pt;color:#999;text-align:center;">
-    Documento gerado por IURISPRUDENTIA. As sugestões são de apoio à decisão. A responsabilidade profissional é do advogado.
-  </p>
+<div class="Section1">
+  <div class="doc-header">
+    <h1>IURISPRUDENTIA — Parecer Jurídico</h1>
+    <p>${safeTitle} &bull; Gerado em ${date}</p>
+  </div>
+  <div class="doc-content">${html}</div>
+  <div class="doc-footer">
+    Documento gerado por IURISPRUDENTIA com assistência de inteligência artificial.<br>
+    As sugestões são de apoio à decisão. A responsabilidade profissional é integralmente do advogado subscritor.
+  </div>
+</div>
 </body>
 </html>`
 
-  const blob = new Blob(['﻿', wordHtml], { type: 'application/msword' })
+  const blob = new Blob(['﻿', wordHtml], {
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${title.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_')}_parecer.doc`
+  a.download = `${title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_')}_parecer.docx`
   a.click()
   URL.revokeObjectURL(url)
 }
