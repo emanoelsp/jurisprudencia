@@ -1,35 +1,35 @@
 // src/app/api/analyze/route.ts
 // Full RAG Pipeline: PDF Text → Chunks → Vector Search → Reranking → TOON → LLM Streaming
 import { NextRequest } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
+import { adminDb } from '@/lib/auth/firebase-admin'
 import {
   searchEproc,
   rerankResults,
   enrichWithToon,
   dedupeEprocResults,
   generateEmbedding,
-} from '@/lib/rag'
-import { queryPinecone } from '@/lib/pinecone'
+} from '@/lib/ai/rag'
+import { queryPinecone } from '@/lib/ai/pinecone'
 import {
   serializeToonForPrompt,
   validateToonIntegrity,
   validateJustificationCitations,
-} from '@/lib/toon'
-import { aiClient, aiModels } from '@/lib/ai'
-import { isLegalScopeText, parseJustificationJson } from '@/lib/guards'
+} from '@/lib/legal/toon'
+import { aiClient, aiModels } from '@/lib/ai/ai'
+import { isLegalScopeText, parseJustificationJson } from '@/lib/auth/guards'
 import { namespaceForUser } from '@/lib/tenant'
-import { requireServerAuth } from '@/lib/server-auth'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import { normalizePlan, planForUserPlan } from '@/lib/plans'
-import { fetchCfPlanalto, getArtigoResumoParaIA } from '@/lib/cf-planalto'
-import { ARTIGOS_CONSTITUCIONAIS } from '@/lib/artigos-constitucionais'
-import { getCodigoPenalResumoParaIA } from '@/lib/codigo-penal'
+import { fetchCfPlanalto, getArtigoResumoParaIA } from '@/lib/legal/cf-planalto'
+import { ARTIGOS_CONSTITUCIONAIS } from '@/lib/legal/artigos-constitucionais'
+import { getCodigoPenalResumoParaIA } from '@/lib/legal/codigo-penal'
 import { BASES_PUBLICAS_SYSTEM, BASES_PUBLICAS_FEW_SHOT, BASES_PUBLICAS_USER_PREFIX } from '@/lib/prompts/bases-publicas'
-import { parseToonBasesPublicas } from '@/lib/toon-bases-publicas'
-import { parseToonCf } from '@/lib/toon-cf'
+import { parseToonBasesPublicas } from '@/lib/legal/toon-bases-publicas'
+import { parseToonCf } from '@/lib/legal/toon-cf'
 import { extractCausaPetendi } from '@/lib/tools/extract-causa-petendi'
 import type { AnalysisChunk } from '@/types'
 import { sanitizePii } from '@/lib/pii'
-import { createTrace } from '@/lib/langfuse'
+import { createTrace } from '@/lib/ai/langfuse'
 import { writeAuditLog } from '@/lib/audit'
 
 function parseBasesPublicasResponse(raw: string): Array<{ id: string; tipo: string; fonte: string; ementa: string; aplicabilidade?: string }> {

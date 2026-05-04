@@ -3,7 +3,7 @@
 // Protegido por SETUP_SECRET (opcional em localhost)
 
 import { NextRequest, NextResponse } from 'next/server'
-import { runLegislacaoIngest } from '@/lib/run-legislacao-ingest'
+import { runLegislacaoIngest } from '@/lib/legal/run-legislacao-ingest'
 import fs from 'fs'
 import path from 'path'
 

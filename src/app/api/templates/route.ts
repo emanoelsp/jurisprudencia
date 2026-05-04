@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { requireServerAuth } from '@/lib/server-auth'
+import { adminDb } from '@/lib/auth/firebase-admin'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import { planForUserPlan, normalizePlan } from '@/lib/plans'
 import type { AnalysisTemplate } from '@/types'
 import { v4 as uuidv4 } from 'uuid'

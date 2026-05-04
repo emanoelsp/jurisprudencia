@@ -1,9 +1,9 @@
 'use client'
 // src/app/dashboard/page.tsx
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth/auth-context'
 import { collection, query, where, getDocs } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/auth/firebase'
 import Link from 'next/link'
 import type { Processo } from '@/types'
 import { statusLabel, statusColor, formatDate, truncate } from '@/lib/utils'

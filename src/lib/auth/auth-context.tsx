@@ -14,7 +14,7 @@ import {
   getAdditionalUserInfo,
 } from 'firebase/auth'
 import { doc, getDoc, onSnapshot } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase'
+import { auth, db } from '@/lib/auth/firebase'
 import type { User } from '@/types'
 import { normalizePlan, PlanId } from '@/lib/plans'
 

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { adminAuth } from '@/lib/firebase-admin'
+import { adminAuth } from '@/lib/auth/firebase-admin'
 
 export type AuthenticatedUser = {
   uid: string

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth/auth-context'
 import { normalizePlan, planForUserPlan, todayDateKey } from '@/lib/plans'
 import Logo from '@/components/ui/Logo'
 import {

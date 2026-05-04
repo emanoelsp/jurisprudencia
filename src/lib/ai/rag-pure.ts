@@ -2,7 +2,7 @@
  * Pure functions extracted from rag.ts — no external dependencies.
  * Re-exported by rag.ts; directly importable in unit tests.
  */
-import type { EprocResult } from '../types/index.ts'
+import type { EprocResult } from '../../types/index.ts'
 
 export const RRF_K = 60
 

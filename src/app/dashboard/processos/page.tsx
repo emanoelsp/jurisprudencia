@@ -2,10 +2,9 @@
 // src/app/dashboard/processos/page.tsx
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth/auth-context'
 import { collection, query, where, getDocs } from 'firebase/firestore'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase'
+import { db } from '@/lib/auth/firebase'
 import { useDropzone } from 'react-dropzone'
 import type { Processo, FormularioProcesso } from '@/types'
 import { statusLabel, statusColor, formatDate } from '@/lib/utils'
@@ -17,14 +16,12 @@ import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import Link from 'next/link'
-import { v4 as uuidv4 } from 'uuid'
 import { planForUserPlan, normalizePlan } from '@/lib/plans'
 
 const emptyForm: FormularioProcesso = {
   numero: '', cliente: '', natureza: '', vara: '', tribunal: '', dataProtocolo: '',
 }
-const STORAGE_UPLOAD_TIMEOUT_MS = 90_000
-const STORAGE_URL_TIMEOUT_MS = 20_000
+const BLOB_UPLOAD_TIMEOUT_MS = 90_000
 
 export default function ProcessosPage() {
   const { user, userData } = useAuth()
@@ -138,28 +135,27 @@ export default function ProcessosPage() {
       let storageUrl = ''
       let storagePath = ''
 
-      const skipStorage = process.env.NEXT_PUBLIC_SKIP_FIREBASE_STORAGE === 'true'
-      if (pdfFile && !skipStorage) {
+      if (pdfFile) {
         const tUpload = performance.now()
         console.log('[save-processo] upload start', { sizeBytes: pdfFile.size, type: pdfFile.type })
         try {
-          const fileRef = ref(storage, `processos/${user.uid}/${uuidv4()}.pdf`)
-          await withTimeout(uploadBytes(fileRef, pdfFile), STORAGE_UPLOAD_TIMEOUT_MS, 'uploadBytes')
-          storagePath = fileRef.fullPath
+          const uploadForm = new FormData()
+          uploadForm.append('file', pdfFile)
+          const headers = await getAuthHeaders()
+          const uploadRes = await withTimeout(
+            fetch('/api/processes/upload-pdf', { method: 'POST', body: uploadForm, headers }),
+            BLOB_UPLOAD_TIMEOUT_MS,
+            'upload-pdf'
+          )
+          const uploadData = await uploadRes.json()
+          if (!uploadRes.ok) throw new Error(uploadData?.error || 'Erro no upload')
+          storageUrl = uploadData.url
           console.log('[save-processo] upload done', { ms: Math.round(performance.now() - tUpload) })
-          try {
-            storageUrl = await withTimeout(getDownloadURL(fileRef), STORAGE_URL_TIMEOUT_MS, 'getDownloadURL')
-            console.log('[save-processo] storage URL generated')
-          } catch (readErr: any) {
-            console.error('[save-processo] getDownloadURL failed', readErr)
-          }
         } catch (uploadErr) {
-          const message = (uploadErr as any)?.code || (uploadErr as any)?.message || 'erro desconhecido'
+          const message = (uploadErr as any)?.message || 'erro desconhecido'
           console.warn('[save-processo] upload failed, salvando sem anexo', message)
-          toast.success('Processo salvo sem PDF (Storage indisponível). O texto extraído foi armazenado.')
+          toast.success('Processo salvo sem PDF (upload indisponível). O texto extraído foi armazenado.')
         }
-      } else if (pdfFile && skipStorage) {
-        toast.success('Processo salvo. PDF não armazenado (modo sem Storage).')
       }
 
       const processo: Omit<Processo, 'id'> = {

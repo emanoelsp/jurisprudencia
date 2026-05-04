@@ -5,9 +5,9 @@
  * e upserta no Pinecone (namespace jurisprudencia_publica).
  */
 
-import { fetchDataJudProcessos } from '@/lib/datajud'
-import { chunkText, generateEmbedding } from '@/lib/rag'
-import { upsertPinecone } from '@/lib/pinecone'
+import { fetchDataJudProcessos } from '@/lib/legal/datajud'
+import { chunkText, generateEmbedding } from '@/lib/ai/rag'
+import { upsertPinecone } from '@/lib/ai/pinecone'
 
 const STF_ALIAS = 'api_publica_stf'
 const CHUNK_SIZE = Number(process.env.RAG_CHUNK_SIZE || 1000)

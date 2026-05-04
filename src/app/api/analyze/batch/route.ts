@@ -3,15 +3,15 @@
 // Plan-gated: Pro = 5, Escritório = 20, Enterprise = unlimited.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { requireServerAuth } from '@/lib/server-auth'
+import { adminDb } from '@/lib/auth/firebase-admin'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import { planForUserPlan, normalizePlan } from '@/lib/plans'
-import { searchEproc, rerankResults, enrichWithToon, dedupeEprocResults, generateEmbedding } from '@/lib/rag'
-import { queryPinecone } from '@/lib/pinecone'
+import { searchEproc, rerankResults, enrichWithToon, dedupeEprocResults, generateEmbedding } from '@/lib/ai/rag'
+import { queryPinecone } from '@/lib/ai/pinecone'
 import { namespaceForUser } from '@/lib/tenant'
 import { sanitizePii } from '@/lib/pii'
 import { writeAuditLog } from '@/lib/audit'
-import { isLegalScopeText } from '@/lib/guards'
+import { isLegalScopeText } from '@/lib/auth/guards'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

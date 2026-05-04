@@ -1,10 +1,10 @@
 // src/app/api/processes/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { requireServerAuth } from '@/lib/server-auth'
+import { adminDb } from '@/lib/auth/firebase-admin'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import { normalizePlan, planForUserPlan, todayDateKey } from '@/lib/plans'
-import { chunkText, generateEmbedding } from '@/lib/rag'
-import { upsertPinecone, deletePineconeByIds } from '@/lib/pinecone'
+import { chunkText, generateEmbedding } from '@/lib/ai/rag'
+import { upsertPinecone, deletePineconeByIds } from '@/lib/ai/pinecone'
 import { namespaceForUser } from '@/lib/tenant'
 
 export const runtime = 'nodejs'

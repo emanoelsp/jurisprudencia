@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth/auth-context'
 import { planForUserPlan, normalizePlan } from '@/lib/plans'
 import {
   Building2, Users, FileText, CheckCircle, Loader2,

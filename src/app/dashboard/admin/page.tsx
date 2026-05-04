@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth/auth-context'
 import {
   BarChart3, Users, DollarSign, Server,
   TrendingUp, TrendingDown, UserCheck, Wallet,

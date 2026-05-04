@@ -1,12 +1,12 @@
 // Lógica compartilhada de ingestão CF/88 e Código Penal no Pinecone
 // Usada por /api/admin/legislacao-ingest e /api/setup/seed-legislacao
 
-import { chunkText, generateEmbedding } from '@/lib/rag'
-import { upsertPinecone } from '@/lib/pinecone'
-import { ARTIGOS_CONSTITUCIONAIS } from '@/lib/artigos-constitucionais'
-import { ARTIGOS_PENAIS, fetchCodigoPenalPlanalto } from '@/lib/codigo-penal'
-import { fetchCfPlanalto } from '@/lib/cf-planalto'
-import type { PineconeVector } from '@/lib/pinecone'
+import { chunkText, generateEmbedding } from '@/lib/ai/rag'
+import { upsertPinecone } from '@/lib/ai/pinecone'
+import { ARTIGOS_CONSTITUCIONAIS } from '@/lib/legal/artigos-constitucionais'
+import { ARTIGOS_PENAIS, fetchCodigoPenalPlanalto } from '@/lib/legal/codigo-penal'
+import { fetchCfPlanalto } from '@/lib/legal/cf-planalto'
+import type { PineconeVector } from '@/lib/ai/pinecone'
 
 export type LegislaçãoFonte = 'cf' | 'cp' | 'ambos'
 

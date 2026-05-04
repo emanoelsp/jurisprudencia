@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb, adminStorage } from '@/lib/firebase-admin'
-import { requireServerAuth } from '@/lib/server-auth'
+import { adminDb, adminStorage } from '@/lib/auth/firebase-admin'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-function extractStoragePathFromUrl(storageUrl: string): string | null {
+function isVercelBlobUrl(url: string): boolean {
+  return url.includes('.blob.vercel-storage.com')
+}
+
+function extractFirebaseStoragePath(storageUrl: string): string | null {
   try {
     const url = new URL(storageUrl)
     const marker = '/o/'
@@ -36,9 +40,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Download permitido apenas para processos aprovados.' }, { status: 403 })
     }
 
+    const pdfHeaders = {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="processo-${id}.pdf"`,
+      'Cache-Control': 'private, max-age=60',
+    }
+
+    // Vercel Blob — stream server-side, URL nunca exposta ao client
+    if (processo.storageUrl && isVercelBlobUrl(processo.storageUrl)) {
+      const blobRes = await fetch(processo.storageUrl)
+      if (!blobRes.ok) {
+        return NextResponse.json({ error: 'PDF não encontrado.' }, { status: 404 })
+      }
+      return new NextResponse(blobRes.body, { headers: pdfHeaders })
+    }
+
+    // Compatibilidade retroativa: Firebase Storage (processos antigos)
     const storagePath =
       processo.storagePath ||
-      (processo.storageUrl ? extractStoragePathFromUrl(processo.storageUrl) : null)
+      (processo.storageUrl ? extractFirebaseStoragePath(processo.storageUrl) : null)
 
     if (storagePath) {
       try {
@@ -47,29 +67,11 @@ export async function GET(req: NextRequest) {
         const [exists] = await file.exists()
         if (exists) {
           const [buffer] = await file.download()
-          return new NextResponse(new Uint8Array(buffer), {
-            headers: {
-              'Content-Type': 'application/pdf',
-              'Content-Disposition': `attachment; filename="processo-${id}.pdf"`,
-              'Cache-Control': 'private, max-age=60',
-            },
-          })
+          return new NextResponse(new Uint8Array(buffer), { headers: pdfHeaders })
         }
-        console.warn('[processes/download] file not found by storagePath, trying storageUrl fallback', {
-          id,
-          storagePath,
-        })
       } catch (err) {
-        console.warn('[processes/download] storagePath download failed, trying storageUrl fallback', {
-          id,
-          storagePath,
-          err,
-        })
+        console.warn('[processes/download] firebase storage fallback failed', { id, storagePath, err })
       }
-    }
-
-    if (processo.storageUrl) {
-      return NextResponse.redirect(processo.storageUrl)
     }
 
     return NextResponse.json({ error: 'PDF não encontrado para este processo.' }, { status: 404 })

@@ -10,9 +10,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { requireServerAuth } from '@/lib/server-auth'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import { ingestLexMLHistorical } from '@/lib/providers/lexml-historical'
-import { LEIS_CURADAS } from '@/lib/lexml-curacao'
+import { LEIS_CURADAS } from '@/lib/legal/lexml-curacao'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

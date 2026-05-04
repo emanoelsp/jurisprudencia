@@ -1,7 +1,7 @@
 // Audit log for Escritório+ plans
 // Written server-side via adminDb (never client-side)
 
-import { adminDb } from '@/lib/firebase-admin'
+import { adminDb } from '@/lib/auth/firebase-admin'
 
 export type AuditAction =
   | 'analysis_run'

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchDataJudProcessos, siglaToDataJudAlias } from '@/lib/datajud'
-import { chunkText, generateEmbedding } from '@/lib/rag'
-import { upsertPinecone } from '@/lib/pinecone'
+import { fetchDataJudProcessos, siglaToDataJudAlias } from '@/lib/legal/datajud'
+import { chunkText, generateEmbedding } from '@/lib/ai/rag'
+import { upsertPinecone } from '@/lib/ai/pinecone'
 import { namespaceForUser } from '@/lib/tenant'
-import { requireServerAuth } from '@/lib/server-auth'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

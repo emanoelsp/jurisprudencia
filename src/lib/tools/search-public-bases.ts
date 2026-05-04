@@ -1,9 +1,9 @@
 // Tool: Pesquisa em bases públicas (DataJud)
 // Interface com APIs de tribunais para extrair jurisprudência
 
-import { fetchDataJudByQuery } from '@/lib/datajud'
+import { fetchDataJudByQuery } from '@/lib/legal/datajud'
 import type { EprocResult } from '@/types'
-import { scoreToBadge } from '@/lib/rag'
+import { scoreToBadge } from '@/lib/ai/rag'
 
 export interface SearchPublicBasesParams {
   queryText: string

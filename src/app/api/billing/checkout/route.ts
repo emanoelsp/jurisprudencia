@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireServerAuth } from '@/lib/server-auth'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import { PLAN_POLICIES, normalizePlan } from '@/lib/plans'
 
 export const runtime = 'nodejs'

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
+import { adminDb } from '@/lib/auth/firebase-admin'
 import { normalizePlan } from '@/lib/plans'
 
 export const runtime = 'nodejs'

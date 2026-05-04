@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { requireServerAuth } from '@/lib/server-auth'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import { ingestStfDecisions } from '@/lib/providers/stf-provider'
 
 export const runtime = 'nodejs'

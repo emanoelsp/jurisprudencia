@@ -3,10 +3,10 @@
 // Returns matching jurisprudencias from Firestore ordered by vector similarity.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { requireServerAuth } from '@/lib/server-auth'
-import { generateEmbedding } from '@/lib/rag'
-import { queryPinecone } from '@/lib/pinecone'
+import { adminDb } from '@/lib/auth/firebase-admin'
+import { requireServerAuth } from '@/lib/auth/server-auth'
+import { generateEmbedding } from '@/lib/ai/rag'
+import { queryPinecone } from '@/lib/ai/pinecone'
 import { namespaceForUser } from '@/lib/tenant'
 import type { JurisprudenciaCriada } from '@/types'
 

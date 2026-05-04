@@ -1,12 +1,12 @@
 'use client'
 // src/app/dashboard/base-conhecimento/page.tsx
 import { useEffect, useState, useRef } from 'react'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth/auth-context'
 import {
   collection, query, where, getDocs,
   doc, deleteDoc,
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/auth/firebase'
 import type { JurisprudenciaCriada } from '@/types'
 import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
 import {

@@ -9,9 +9,9 @@
  * Veja docs/TASKS.md para roadmap de preenchimento.
  */
 
-import { fetchLexMLByQuery, parseLexMLDate } from '@/lib/lexml'
-import { chunkText, generateEmbedding } from '@/lib/rag'
-import { upsertPinecone } from '@/lib/pinecone'
+import { fetchLexMLByQuery, parseLexMLDate } from '@/lib/legal/lexml'
+import { chunkText, generateEmbedding } from '@/lib/ai/rag'
+import { upsertPinecone } from '@/lib/ai/pinecone'
 
 export interface LexMLHistoricalOptions {
   /** URN LexML canônica da lei, ex: "urn:lex:br:federal:lei:2002-01-10;10406" */

@@ -2,8 +2,8 @@
 // Returns an HTML bundle of all approved pareceres for download.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { requireServerAuth } from '@/lib/server-auth'
+import { adminDb } from '@/lib/auth/firebase-admin'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import type { JurisprudenciaCriada } from '@/types'
 
 export const runtime = 'nodejs'

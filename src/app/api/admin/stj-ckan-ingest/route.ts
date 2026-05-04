@@ -3,15 +3,15 @@
 // Se a API CKAN retornar 403, use resourceUrl no body com um link direto (ex.: copiado do portal).
 
 import { NextRequest, NextResponse } from 'next/server'
-import { requireServerAuth } from '@/lib/server-auth'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import {
   getStjAcordaosResourceUrls,
   fetchResourceJson,
   parseStjResourceJson,
   type StjDocNormalized,
-} from '@/lib/stj-dados-abertos'
-import { chunkText, generateEmbedding } from '@/lib/rag'
-import { upsertPinecone } from '@/lib/pinecone'
+} from '@/lib/legal/stj-dados-abertos'
+import { chunkText, generateEmbedding } from '@/lib/ai/rag'
+import { upsertPinecone } from '@/lib/ai/pinecone'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

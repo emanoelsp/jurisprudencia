@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth/auth-context'
 import { PLAN_POLICIES, PlanId, normalizePlan } from '@/lib/plans'
 import { Crown, Loader2, ShieldCheck, Rocket, Check, X } from 'lucide-react'
 import toast from 'react-hot-toast'

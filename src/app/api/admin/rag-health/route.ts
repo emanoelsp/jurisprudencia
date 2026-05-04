@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireServerAuth } from '@/lib/server-auth'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import { Pinecone } from '@pinecone-database/pinecone'
 import { namespaceForUser } from '@/lib/tenant'
 

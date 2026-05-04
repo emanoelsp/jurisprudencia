@@ -1,9 +1,9 @@
 // src/app/api/jurisprudencia/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
+import { adminDb } from '@/lib/auth/firebase-admin'
 import type { JurisprudenciaCriada } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
-import { requireServerAuth } from '@/lib/server-auth'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import { writeAuditLog } from '@/lib/audit'
 import { planForUserPlan, normalizePlan } from '@/lib/plans'
 

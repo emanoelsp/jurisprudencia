@@ -1,12 +1,12 @@
 // src/lib/rag.ts
 // RAG Pipeline: PDF → Chunks → Embeddings → Vector Search → Reranking → TOON → LLM
 import type { EprocResult } from '@/types'
-import { createToonPayload } from './toon'
+import { createToonPayload } from '../legal/toon'
 import { aiClient, aiModels } from './ai'
-import { parseExtractedMetadataJson } from './guards'
+import { parseExtractedMetadataJson } from '../auth/guards'
 import { queryPinecone } from './pinecone'
-import { fetchDataJudByQuery } from './datajud'
-import { fetchLexMLByQuery } from './lexml'
+import { fetchDataJudByQuery } from '../legal/datajud'
+import { fetchLexMLByQuery } from '../legal/lexml'
 import { hashKey, redisGet, redisSet, EMBEDDING_TTL_S } from './cache'
 
 const EMBEDDING_CACHE_TTL_MS = 30 * 60 * 1000
@@ -53,7 +53,7 @@ function normalizeEmenta(input: string): string {
   return input.replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
-import { parseLexMLDate } from './lexml'
+import { parseLexMLDate } from '../legal/lexml'
 
 const LEGISLACAO_FONTES = new Set(['lexml', 'cf_88', 'codigo_penal'])
 

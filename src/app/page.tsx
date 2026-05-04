@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth/auth-context'
 import Logo from '@/components/ui/Logo'
 import { Eye, EyeOff, ArrowRight, Scale, Shield, BookOpen, BarChart3, ChevronRight, Layers, LayoutTemplate, Building2 } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'

@@ -2,7 +2,7 @@
 import type { Metadata } from 'next'
 import { Playfair_Display, Source_Sans_3, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
-import { AuthProvider } from '@/lib/auth-context'
+import { AuthProvider } from '@/lib/auth/auth-context'
 import { Toaster } from 'react-hot-toast'
 import './globals.css'
 

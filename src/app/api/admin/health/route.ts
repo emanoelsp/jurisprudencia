@@ -1,7 +1,7 @@
 // GET /api/admin/health — checks API key presence and quota status
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { requireServerAuth } from '@/lib/server-auth'
+import { adminDb } from '@/lib/auth/firebase-admin'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

@@ -33,7 +33,7 @@ export async function register() {
       // Executa seed em background (não bloqueia startup)
       setImmediate(async () => {
         try {
-          const { runLegislacaoIngest } = await import('./src/lib/run-legislacao-ingest')
+          const { runLegislacaoIngest } = await import('./src/lib/legal/run-legislacao-ingest')
           const result = await runLegislacaoIngest({ dryRun: false, fonte: 'ambos' })
           if (result.success) {
             markSeeded()

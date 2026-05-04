@@ -1,6 +1,6 @@
 // src/app/api/shares/[token]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
+import { adminDb } from '@/lib/auth/firebase-admin'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

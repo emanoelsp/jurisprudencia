@@ -3,8 +3,8 @@
 // Body: { dryRun?: boolean, fonte?: 'cf' | 'cp' | 'ambos' }
 
 import { NextRequest, NextResponse } from 'next/server'
-import { requireServerAuth } from '@/lib/server-auth'
-import { runLegislacaoIngest } from '@/lib/run-legislacao-ingest'
+import { requireServerAuth } from '@/lib/auth/server-auth'
+import { runLegislacaoIngest } from '@/lib/legal/run-legislacao-ingest'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

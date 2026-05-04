@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth/auth-context'
 import { planForUserPlan, normalizePlan } from '@/lib/plans'
 import type { AnalysisTemplate } from '@/types'
 import { Plus, Pencil, Trash2, Loader2, FileText, Lock, X, Check } from 'lucide-react'

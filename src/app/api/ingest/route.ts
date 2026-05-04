@@ -1,7 +1,7 @@
 // src/app/api/ingest/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { extractTextFromBuffer, extractMetadata } from '@/lib/rag'
-import { requireServerAuth } from '@/lib/server-auth'
+import { extractTextFromBuffer, extractMetadata } from '@/lib/ai/rag'
+import { requireServerAuth } from '@/lib/auth/server-auth'
 import { sanitizePii } from '@/lib/pii'
 
 export const runtime = 'nodejs'
