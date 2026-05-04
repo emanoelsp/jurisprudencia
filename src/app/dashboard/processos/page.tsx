@@ -11,7 +11,7 @@ import type { Processo, FormularioProcesso } from '@/types'
 import { statusLabel, statusColor, formatDate } from '@/lib/utils'
 import {
   Upload, FileText, Search, Plus, Loader2,
-  CheckCircle, X, ArrowRight, Sparkles, Download, Trash2, AlertTriangle, Layers,
+  CheckCircle, X, ArrowRight, Sparkles, Download, Trash2, AlertTriangle, Layers, SlidersHorizontal,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
@@ -36,6 +36,10 @@ export default function ProcessosPage() {
   const [processos, setProcessos]   = useState<Processo[]>([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
+  const [filterTribunal, setFilterTribunal] = useState('')
+  const [filterStatus, setFilterStatus]     = useState('')
+  const [filterNatureza, setFilterNatureza] = useState('')
+  const [showFilters, setShowFilters]       = useState(false)
   const [showModal, setShowModal]   = useState(false)
   const [uploading, setUploading]   = useState(false)
   const [extracting, setExtracting] = useState(false)
@@ -326,11 +330,22 @@ export default function ProcessosPage() {
     }
   }
 
-  const filtered = processos.filter(p =>
-    p.numero?.toLowerCase().includes(search.toLowerCase()) ||
-    p.cliente?.toLowerCase().includes(search.toLowerCase()) ||
-    p.natureza?.toLowerCase().includes(search.toLowerCase())
-  )
+  const naturezasDisponiveis = Array.from(new Set(processos.map(p => p.natureza).filter(Boolean))).sort()
+  const tribunaisDisponiveis = Array.from(new Set(processos.map(p => p.tribunal).filter(Boolean))).sort()
+
+  const filtered = processos.filter(p => {
+    const q = search.toLowerCase()
+    const matchSearch = !search ||
+      p.numero?.toLowerCase().includes(q) ||
+      p.cliente?.toLowerCase().includes(q) ||
+      p.natureza?.toLowerCase().includes(q)
+    const matchTribunal = !filterTribunal || p.tribunal === filterTribunal
+    const matchStatus   = !filterStatus   || p.status === filterStatus
+    const matchNatureza = !filterNatureza || p.natureza === filterNatureza
+    return matchSearch && matchTribunal && matchStatus && matchNatureza
+  })
+
+  const hasActiveFilters = !!(filterTribunal || filterStatus || filterNatureza)
 
   if (loading) return (
     <div className="p-6 space-y-4">
@@ -386,16 +401,86 @@ export default function ProcessosPage() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-slate" />
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por numero, cliente ou natureza..."
-          className="input pl-11"
-        />
+      {/* Search + Filters */}
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-slate" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por numero, cliente ou natureza..."
+              className="input pl-11"
+            />
+          </div>
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={cn(
+              'btn-ghost px-3 py-2 text-sm gap-2 flex-shrink-0',
+              hasActiveFilters && 'text-brand-indigo border-brand-indigo/40',
+            )}
+            title="Filtros avançados"
+          >
+            <SlidersHorizontal size={15} />
+            <span className="hidden sm:inline">Filtros</span>
+            {hasActiveFilters && (
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-indigo" />
+            )}
+          </button>
+        </div>
+
+        {showFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-4 bg-brand-navylt border border-brand-border rounded-lg">
+            <div>
+              <label className="block text-[11px] font-semibold text-brand-slate uppercase tracking-wider mb-1">Tribunal</label>
+              <select
+                value={filterTribunal}
+                onChange={e => setFilterTribunal(e.target.value)}
+                className="input text-sm py-2"
+              >
+                <option value="">Todos</option>
+                {tribunaisDisponiveis.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-brand-slate uppercase tracking-wider mb-1">Natureza</label>
+              <select
+                value={filterNatureza}
+                onChange={e => setFilterNatureza(e.target.value)}
+                className="input text-sm py-2"
+              >
+                <option value="">Todas</option>
+                {naturezasDisponiveis.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-brand-slate uppercase tracking-wider mb-1">Status</label>
+              <select
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+                className="input text-sm py-2"
+              >
+                <option value="">Todos</option>
+                <option value="pending">Pendente</option>
+                <option value="processing">Processando</option>
+                <option value="analyzed">Analisado</option>
+                <option value="approved">Aprovado</option>
+                <option value="error">Erro</option>
+              </select>
+            </div>
+            {hasActiveFilters && (
+              <div className="sm:col-span-3 flex justify-end">
+                <button
+                  onClick={() => { setFilterTribunal(''); setFilterStatus(''); setFilterNatureza('') }}
+                  className="text-xs text-brand-slate hover:text-brand-cream flex items-center gap-1.5"
+                >
+                  <X size={12} /> Limpar filtros
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* List */}
