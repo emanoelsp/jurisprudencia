@@ -17,7 +17,7 @@ import {
   Sparkles, Save, CheckCircle, AlertCircle,
   ArrowLeft, FileText, Loader2, Cpu,
   Shield, AlignLeft, Library, Database, Scale, BookOpen, Gavel, ChevronDown,
-  History, X, Expand, AlertTriangle, Landmark, FileDown, FileText as FileWord, PlusCircle,
+  History, X, Expand, AlertTriangle, Landmark, FileDown, FileText as FileWord, PlusCircle, Share2,
 } from 'lucide-react'
 import { statusLabel, statusColor, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -86,6 +86,7 @@ export default function AnalisarPage() {
   const [showExpandModal, setShowExpandModal] = useState(false)
   const [templates, setTemplates] = useState<AnalysisTemplate[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
+  const [sharing, setSharing] = useState(false)
 
   const INITIAL_AGENT_STEPS: Array<{ label: string; done: boolean }> = [
     { label: 'Analisei o texto do processo para extrair tema, pedidos e causa de pedir.', done: false },
@@ -159,6 +160,37 @@ export default function AnalisarPage() {
     const token = await user?.getIdToken()
     if (token) headers.Authorization = `Bearer ${token}`
     return headers
+  }
+
+  async function handleShare() {
+    const content = editorRef.current?.getHTML() ?? editorContent
+    if (!content || content === '<p></p>') {
+      toast.error('Gere e salve um parecer antes de compartilhar.')
+      return
+    }
+    setSharing(true)
+    try {
+      const res = await fetch('/api/shares', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+        body: JSON.stringify({
+          processId: id,
+          content,
+          title: `${processo?.cliente || 'Parecer'} — ${processo?.numero || ''}`,
+          processNumber: processo?.numero,
+          cliente: processo?.cliente,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao gerar link')
+      const url = `${window.location.origin}/share/${data.token}`
+      await navigator.clipboard.writeText(url)
+      toast.success('Link copiado! Válido por 7 dias.', { duration: 4000 })
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao compartilhar')
+    } finally {
+      setSharing(false)
+    }
   }
 
   async function startAnalysis(options?: { expandScope?: boolean }) {
@@ -677,6 +709,14 @@ export default function AnalisarPage() {
             title="Histórico de versões"
           >
             <History size={14} />
+          </button>
+          <button
+            onClick={handleShare}
+            disabled={sharing}
+            className="btn-ghost text-xs py-2 px-2"
+            title="Compartilhar parecer (link público, 7 dias)"
+          >
+            {sharing ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
           </button>
           {canExport ? (
             <>

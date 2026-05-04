@@ -71,6 +71,13 @@
 - [x] **Alertas de quota / Saúde das APIs** — `GET /api/admin/health`: verifica todas as env vars críticas, painel com status por serviço no admin
 - [x] **Testes E2E (Playwright)** — `tests/e2e/fixtures.ts` com helper `loginAs` + fixture `loggedInPage`; cobertura: auth, dashboard, processos, planos, templates, perfil, base de conhecimento
 
+### Backlog — Sprint atual (2026-05-04 →)
+- [ ] **#1 Compartilhamento de pareceres** — link público com expiração (7 dias), sem login, só leitura. `POST /api/shares` + `GET /api/shares/[token]` + `/share/[token]` + botão no analisar.
+- [ ] **#2 Notificação ao terminar análise em lote** — toast em tempo real via Firestore listener + e-mail opcional (Resend) quando batch termina (Pro+).
+- [ ] **#3 Filtros avançados nos processos** — filtrar por tribunal, natureza, data de protocolo e status da análise na página de processos.
+- [ ] **#4 Landing page atualizada** — screenshots reais, CTAs atualizados (templates, batch, escritório), copy revisado.
+- [ ] **#5 Exportar parecer para Word (.docx)** — via `docx` npm + botão no LegalEditor ao lado do PDF.
+
 ### Backlog (sem prazo)
 - [x] **Curadoria Camada 3** — `src/lib/lexml-curacao.ts` com 10 leis (CP, CF/88, CDC, CLT, CC, CPC, CPP, LIA, Maria da Penha, ECA). Batch ingest via `POST /api/admin/lexml-batch-ingest` + botão no painel admin.
 - [x] **Testes unitários — rag.ts** — `chunkText`, `fuseWithRRF`, `scoreToBadge`, `dedupeEprocResults` em `tests/unit-rag.test.js` (22 testes). Funções puras extraídas para `src/lib/rag-pure.ts`. Total: 61 testes unitários.
